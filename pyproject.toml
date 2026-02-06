@@ -1,0 +1,53 @@
+[project]
+name = "audit-rag-engine"
+version = "0.1.0"
+description = "RAG Engine for AI Audit Assistant - Docling + LangChain + Neo4j"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    # Document processing
+    "docling>=2.0.0",
+    "langchain-docling>=0.1.0",
+    "docling-core[chunking]>=2.0.0",
+    # RAG & LLM
+    "langchain>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langchain-community>=0.3.0",
+    "neo4j-graphrag-python>=1.0.0",
+    # Databases
+    "neo4j>=5.15.0",
+    "pymongo>=4.6.0",
+    "motor>=3.3.0",
+    "boto3>=1.34.0",
+    # Utilities
+    "python-multipart>=0.0.6",
+    "httpx>=0.26.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.2.0",
+    "mypy>=1.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
