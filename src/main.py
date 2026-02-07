@@ -1,17 +1,43 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from src.api.routes import health, ingest, retrieve, generate
+from src.api.routes import generate, health, ingest, retrieve
+from src.stores.document_store import document_store
+from src.stores.neo4j_store import neo4j_store
+from src.stores.object_store import object_store
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: initialize DB connections
-    print("Starting Audit RAG Engine...")
+    logger.info("Starting Audit RAG Engine...")
+
+    # Connect to Neo4j and ensure indexes
+    await neo4j_store.connect()
+    await neo4j_store.ensure_indexes()
+
+    # Connect to MongoDB and ensure indexes
+    await document_store.connect()
+
+    # Connect to S3/MinIO
+    object_store.connect()
+
+    logger.info("All connections established. Audit RAG Engine ready.")
     yield
+
     # Shutdown: close connections
-    print("Shutting down Audit RAG Engine...")
+    logger.info("Shutting down Audit RAG Engine...")
+    await neo4j_store.close()
+    await document_store.close()
+    logger.info("Audit RAG Engine stopped.")
 
 
 app = FastAPI(
