@@ -1,0 +1,65 @@
+"""Data models for the audit RAG engine."""
+
+from src.models.chunk import ChunkMetadata, ChunkRecord, ChunkWithEmbedding
+from src.models.document import (
+    ConfidentialityLevel,
+    DocType,
+    DocumentACL,
+    DocumentMetadata,
+    DocumentRecord,
+    IngestRequest,
+    IngestResponse,
+    JobStatusResponse,
+    ProcessingStatus,
+    SourceSystem,
+)
+from src.models.entity import (
+    EntityRecord,
+    EntityType,
+    ExtractionResult,
+    RelationshipRecord,
+    RelationshipType,
+)
+from src.models.retrieval import (
+    Citation,
+    GenerateRequest,
+    GenerateResponse,
+    GraphExpansion,
+    RelatedEntity,
+    RetrievalFilters,
+    RetrievalMode,
+    RetrieveRequest,
+    RetrieveResponse,
+    RetrievedChunk,
+)
+
+__all__ = [
+    "ChunkMetadata",
+    "ChunkRecord",
+    "ChunkWithEmbedding",
+    "Citation",
+    "ConfidentialityLevel",
+    "DocType",
+    "DocumentACL",
+    "DocumentMetadata",
+    "DocumentRecord",
+    "EntityRecord",
+    "EntityType",
+    "ExtractionResult",
+    "GenerateRequest",
+    "GenerateResponse",
+    "GraphExpansion",
+    "IngestRequest",
+    "IngestResponse",
+    "JobStatusResponse",
+    "ProcessingStatus",
+    "RelatedEntity",
+    "RelationshipRecord",
+    "RelationshipType",
+    "RetrievalFilters",
+    "RetrievalMode",
+    "RetrieveRequest",
+    "RetrieveResponse",
+    "RetrievedChunk",
+    "SourceSystem",
+]
