@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from src.api.routes import generate, health, ingest, retrieve
+from src.api.routes import generate, health, ingest, retrieve, workflow
 from src.stores.document_store import document_store
 from src.stores.neo4j_store import neo4j_store
 from src.stores.object_store import object_store
@@ -51,3 +51,4 @@ app.include_router(health.router, tags=["health"])
 app.include_router(ingest.router, prefix="/ingest", tags=["ingestion"])
 app.include_router(retrieve.router, prefix="/retrieve", tags=["retrieval"])
 app.include_router(generate.router, prefix="/generate", tags=["generation"])
+app.include_router(workflow.router, prefix="/workflow", tags=["workflow"])
