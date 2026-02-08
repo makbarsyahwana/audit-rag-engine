@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     chunk_max_tokens: int = 512
     chunk_merge_peers: bool = True
 
+    # RabbitMQ
+    rabbitmq_url: str = "amqp://audit_user:audit_pass@localhost:5672/audit"
+
+    # Entity extraction
+    entity_extraction_enabled: bool = True
+    entity_embedding_enabled: bool = True
+
     # Retrieval defaults
     retrieval_top_k: int = 10
     rerank_enabled: bool = False

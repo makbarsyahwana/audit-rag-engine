@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from src.api.routes import generate, health, ingest, observability, retrieve, workflow
+from src.api.routes import connectors, generate, health, ingest, observability, retrieve, workflow
+from src.ingestion.task_broker import task_broker
 from src.observability.logging import setup_logging
 from src.observability.metrics import add_metrics_middleware
 from src.observability.model_cards import register_default_models
@@ -36,6 +37,12 @@ async def lifespan(app: FastAPI):
     # Connect to S3/MinIO
     object_store.connect()
 
+    # Connect to RabbitMQ
+    try:
+        await task_broker.connect()
+    except Exception as exc:
+        logger.warning("RabbitMQ not available (async ingestion disabled): %s", exc)
+
     # Register model cards
     register_default_models()
 
@@ -48,6 +55,7 @@ async def lifespan(app: FastAPI):
     # Shutdown: close connections
     logger.info("Shutting down Audit RAG Engine...")
     shutdown_tracing()
+    await task_broker.close()
     await neo4j_store.close()
     await document_store.close()
     logger.info("Audit RAG Engine stopped.")
@@ -72,3 +80,4 @@ app.include_router(retrieve.router, prefix="/retrieve", tags=["retrieval"])
 app.include_router(generate.router, prefix="/generate", tags=["generation"])
 app.include_router(workflow.router, prefix="/workflow", tags=["workflow"])
 app.include_router(observability.router, prefix="/ops", tags=["observability"])
+app.include_router(connectors.router, prefix="/connectors", tags=["connectors"])
