@@ -8,8 +8,10 @@ from src.models.retrieval import (
     RetrieveRequest,
     RetrieveResponse,
 )
+from src.retrieval.entity_vector import entity_vector_search
 from src.retrieval.fulltext import fulltext_search
 from src.retrieval.graph import graph_search
+from src.retrieval.graph_vector_fulltext import graph_vector_fulltext_search
 from src.retrieval.hybrid import hybrid_search
 from src.retrieval.reranker import rerank
 from src.retrieval.router import classify_query
@@ -50,6 +52,20 @@ async def retrieve_auto(request: RetrieveRequest):
             engagement_id=request.engagement_id,
             top_k=request.top_k,
             depth=request.graph_expansion.depth,
+        )
+    elif mode == RetrievalMode.ENTITY_VECTOR:
+        chunks, latency = await entity_vector_search(
+            query=request.query,
+            engagement_id=request.engagement_id,
+            top_k=request.top_k,
+            entity_types=request.filters.entity_types or None,
+        )
+    elif mode == RetrievalMode.GRAPH_VECTOR_FULLTEXT:
+        chunks, latency = await graph_vector_fulltext_search(
+            query=request.query,
+            engagement_id=request.engagement_id,
+            top_k=request.top_k,
+            doc_types=doc_types,
         )
     else:
         chunks, latency = await hybrid_search(
@@ -125,6 +141,48 @@ async def retrieve_graph(request: RetrieveRequest):
     return RetrieveResponse(
         query=request.query,
         mode=RetrievalMode.GRAPH,
+        chunks=chunks,
+        total_results=len(chunks),
+        latency_ms=latency,
+    )
+
+
+@router.post("/entity-vector", response_model=RetrieveResponse)
+async def retrieve_entity_vector(request: RetrieveRequest):
+    """Entity vector retrieval via Neo4j entity embeddings KNN."""
+    chunks, latency = await entity_vector_search(
+        query=request.query,
+        engagement_id=request.engagement_id,
+        top_k=request.top_k,
+        entity_types=request.filters.entity_types or None,
+    )
+
+    return RetrieveResponse(
+        query=request.query,
+        mode=RetrievalMode.ENTITY_VECTOR,
+        chunks=chunks,
+        total_results=len(chunks),
+        latency_ms=latency,
+    )
+
+
+@router.post("/graph-vector-fulltext", response_model=RetrieveResponse)
+async def retrieve_graph_vector_fulltext(request: RetrieveRequest):
+    """Full hybrid retrieval: vector + fulltext + graph expansion."""
+    doc_types = request.filters.doc_types or None
+    chunks, latency = await graph_vector_fulltext_search(
+        query=request.query,
+        engagement_id=request.engagement_id,
+        top_k=request.top_k,
+        doc_types=doc_types,
+    )
+
+    if settings.rerank_enabled:
+        chunks = rerank(chunks, request.query, request.top_k)
+
+    return RetrieveResponse(
+        query=request.query,
+        mode=RetrievalMode.GRAPH_VECTOR_FULLTEXT,
         chunks=chunks,
         total_results=len(chunks),
         latency_ms=latency,

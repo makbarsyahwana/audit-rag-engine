@@ -330,6 +330,49 @@ class Neo4jStore:
         return records
 
     # ------------------------------------------------------------------
+    # Retrieval: Entity vector search (KNN over entity embeddings)
+    # ------------------------------------------------------------------
+
+    async def entity_vector_search(
+        self,
+        query_embedding: list[float],
+        engagement_id: str,
+        top_k: int = 10,
+        entity_types: Optional[list[str]] = None,
+    ) -> list[dict[str, Any]]:
+        """KNN search over entity embeddings, expand to linked chunks."""
+        where_clause = "WHERE entity.engagement_id = $engagement_id"
+        if entity_types:
+            where_clause += " AND entity.type IN $entity_types"
+
+        query = f"""
+        CALL db.index.vector.queryNodes('entity_embeddings', $top_k, $query_embedding)
+        YIELD node AS entity, score
+        {where_clause}
+        WITH entity, score
+        ORDER BY score DESC
+        LIMIT $top_k
+        OPTIONAL MATCH (entity)-[:MENTIONED_IN]->(chunk:Chunk)
+        OPTIONAL MATCH (chunk)-[:BELONGS_TO]->(doc:Document)
+        OPTIONAL MATCH (entity)-[rel:RELATES_TO]-(related:Entity)
+        RETURN entity, score,
+               collect(DISTINCT {{chunk: chunk, doc: doc}}) AS chunk_docs,
+               collect(DISTINCT {{entity: related, relationship: type(rel)}}) AS related_entities
+        """
+        params: dict[str, Any] = {
+            "query_embedding": query_embedding,
+            "engagement_id": engagement_id,
+            "top_k": top_k,
+        }
+        if entity_types:
+            params["entity_types"] = entity_types
+
+        async with self.driver.session() as session:
+            result = await session.run(query, **params)
+            records = [record.data() async for record in result]
+        return records
+
+    # ------------------------------------------------------------------
     # Retrieval: Hybrid (V + K + G)
     # ------------------------------------------------------------------
 
@@ -361,6 +404,69 @@ class Neo4jStore:
         """
         params: dict[str, Any] = {
             "query_embedding": query_embedding,
+            "engagement_id": engagement_id,
+            "top_k": top_k,
+        }
+        if doc_types:
+            params["doc_types"] = doc_types
+
+        async with self.driver.session() as session:
+            result = await session.run(query, **params)
+            records = [record.data() async for record in result]
+        return records
+
+    # ------------------------------------------------------------------
+    # Retrieval: Graph + Vector + Fulltext (full hybrid)
+    # ------------------------------------------------------------------
+
+    async def graph_vector_fulltext_search(
+        self,
+        query_embedding: list[float],
+        query_text: str,
+        engagement_id: str,
+        top_k: int = 10,
+        doc_types: Optional[list[str]] = None,
+    ) -> list[dict[str, Any]]:
+        """Full hybrid: vector KNN ∪ fulltext hits → graph expansion.
+
+        Combines vector similarity, keyword matching, and graph traversal
+        into a single merged result set — matching llm-graph-builder's
+        graph_vector_fulltext mode.
+        """
+        where_filter = "AND chunk.doc_type IN $doc_types" if doc_types else ""
+
+        query = f"""
+        // Vector KNN hits
+        CALL db.index.vector.queryNodes('chunk_embeddings', $top_k, $query_embedding)
+        YIELD node AS chunk, score
+        WHERE chunk.engagement_id = $engagement_id {where_filter}
+        WITH collect({{chunk: chunk, score: score}}) AS vector_hits
+
+        // Fulltext hits
+        CALL db.index.fulltext.queryNodes('chunk_fulltext', $query_text)
+        YIELD node AS ft_chunk, score AS ft_score
+        WHERE ft_chunk.engagement_id = $engagement_id {where_filter}
+        WITH vector_hits, collect({{chunk: ft_chunk, score: ft_score * 0.8}}) AS ft_hits
+
+        // Merge and deduplicate
+        WITH vector_hits + ft_hits AS all_hits
+        UNWIND all_hits AS hit
+        WITH hit.chunk AS chunk, max(hit.score) AS score
+        ORDER BY score DESC
+        LIMIT $top_k
+
+        // Graph expansion
+        OPTIONAL MATCH (chunk)-[:BELONGS_TO]->(doc:Document)
+        OPTIONAL MATCH (entity:Entity)-[:MENTIONED_IN]->(chunk)
+        OPTIONAL MATCH (entity)-[rel:RELATES_TO]-(related:Entity)
+        RETURN chunk, score, doc,
+               collect(DISTINCT entity) AS entities,
+               collect(DISTINCT {{entity: related, relationship: type(rel)}}) AS related_entities
+        ORDER BY score DESC
+        """
+        params: dict[str, Any] = {
+            "query_embedding": query_embedding,
+            "query_text": query_text,
             "engagement_id": engagement_id,
             "top_k": top_k,
         }

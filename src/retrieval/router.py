@@ -28,8 +28,17 @@ GRAPH_PATTERNS = [
     r"\bown(ed|er|s)\b.*\b(control|process|system)",
 ]
 
+# Patterns that suggest entity-centric search
+ENTITY_PATTERNS = [
+    r"\bfind\s+(similar|related)\s+(entities|controls|risks|systems)",
+    r"\bentit(y|ies)\s+(like|similar|matching)",
+    r"\bcompare\s+(controls?|risks?|systems?|processes?)",
+    r"\bwhat\s+is\s+(the\s+)?(\w+\s+)?(control|risk|system|process|policy)\b",
+]
+
 FULLTEXT_RE = [re.compile(p, re.IGNORECASE) for p in FULLTEXT_PATTERNS]
 GRAPH_RE = [re.compile(p, re.IGNORECASE) for p in GRAPH_PATTERNS]
+ENTITY_RE = [re.compile(p, re.IGNORECASE) for p in ENTITY_PATTERNS]
 
 
 def classify_query(query: str) -> RetrievalMode:
@@ -38,7 +47,8 @@ def classify_query(query: str) -> RetrievalMode:
     Classification logic:
     - Exact reference / clause ID patterns → fulltext
     - Entity relationship patterns → graph
-    - Mixed signals → hybrid
+    - Entity-centric patterns → entity_vector
+    - Mixed signals (fulltext + graph) → graph_vector_fulltext
     - Default (conceptual / explain) → vector
 
     Args:
@@ -49,9 +59,12 @@ def classify_query(query: str) -> RetrievalMode:
     """
     has_fulltext_signal = any(p.search(query) for p in FULLTEXT_RE)
     has_graph_signal = any(p.search(query) for p in GRAPH_RE)
+    has_entity_signal = any(p.search(query) for p in ENTITY_RE)
 
-    if has_fulltext_signal and has_graph_signal:
-        mode = RetrievalMode.HYBRID
+    if has_entity_signal:
+        mode = RetrievalMode.ENTITY_VECTOR
+    elif has_fulltext_signal and has_graph_signal:
+        mode = RetrievalMode.GRAPH_VECTOR_FULLTEXT
     elif has_fulltext_signal:
         mode = RetrievalMode.FULLTEXT
     elif has_graph_signal:
@@ -65,10 +78,11 @@ def classify_query(query: str) -> RetrievalMode:
             mode = RetrievalMode.VECTOR
 
     logger.info(
-        "Query classified: mode=%s (fulltext=%s, graph=%s) — '%s'",
+        "Query classified: mode=%s (fulltext=%s, graph=%s, entity=%s) — '%s'",
         mode.value,
         has_fulltext_signal,
         has_graph_signal,
+        has_entity_signal,
         query[:80],
     )
     return mode

@@ -12,8 +12,10 @@ from src.models.retrieval import (
     GenerateResponse,
     RetrievalMode,
 )
+from src.retrieval.entity_vector import entity_vector_search
 from src.retrieval.fulltext import fulltext_search
 from src.retrieval.graph import graph_search
+from src.retrieval.graph_vector_fulltext import graph_vector_fulltext_search
 from src.retrieval.hybrid import hybrid_search
 from src.retrieval.reranker import rerank
 from src.retrieval.router import classify_query
@@ -67,6 +69,20 @@ async def generate_answer(request: GenerateRequest):
             top_k=request.top_k,
             depth=request.graph_expansion.depth,
         )
+    elif mode == RetrievalMode.ENTITY_VECTOR:
+        chunks, _ = await entity_vector_search(
+            query=request.query,
+            engagement_id=request.engagement_id,
+            top_k=request.top_k,
+            entity_types=request.filters.entity_types or None,
+        )
+    elif mode == RetrievalMode.GRAPH_VECTOR_FULLTEXT:
+        chunks, _ = await graph_vector_fulltext_search(
+            query=request.query,
+            engagement_id=request.engagement_id,
+            top_k=request.top_k,
+            doc_types=doc_types,
+        )
     else:
         chunks, _ = await hybrid_search(
             query=request.query,
@@ -94,16 +110,25 @@ async def generate_answer(request: GenerateRequest):
             abstained=True,
         )
 
-    # 4. Build prompt and invoke LLM
-    chunk_dicts = [
-        {
+    # 4. Build prompt and invoke LLM (include entity context)
+    chunk_dicts = []
+    for c in chunks:
+        d = {
             "chunk_id": c.chunk_id,
             "content": c.content,
             "document_name": c.document_name,
             "page_number": c.page_number,
         }
-        for c in chunks
-    ]
+        if c.entities:
+            d["entities"] = [
+                f"{e.name} ({e.type})" for e in c.entities if e.name
+            ]
+        if c.related_entities:
+            d["related_entities"] = [
+                f"{e.name} ({e.type}) [{e.relationship}]"
+                for e in c.related_entities if e.name
+            ]
+        chunk_dicts.append(d)
     messages = build_qa_messages(request.query, chunk_dicts)
     llm_response = await invoke_llm(messages)
 

@@ -11,6 +11,8 @@ class RetrievalMode(str, Enum):
     FULLTEXT = "fulltext"
     GRAPH = "graph"
     HYBRID = "hybrid"
+    ENTITY_VECTOR = "entity_vector"
+    GRAPH_VECTOR_FULLTEXT = "graph_vector_fulltext"
     AUTO = "auto"
 
 

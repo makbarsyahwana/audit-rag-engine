@@ -53,7 +53,18 @@ def format_context(chunks: list[dict]) -> str:
             header += f", page: {page}"
         header += ")"
 
-        context_parts.append(f"{header}\n{content}")
+        parts = [f"{header}\n{content}"]
+
+        # Include entity context if available
+        entities = chunk.get("entities", [])
+        if entities:
+            parts.append(f"Entities: {', '.join(entities)}")
+
+        related = chunk.get("related_entities", [])
+        if related:
+            parts.append(f"Related entities: {', '.join(related)}")
+
+        context_parts.append("\n".join(parts))
 
     return "\n\n---\n\n".join(context_parts)
 
