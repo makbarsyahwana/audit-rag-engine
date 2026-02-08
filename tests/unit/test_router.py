@@ -20,8 +20,9 @@ def test_graph_ownership_query():
 
 
 def test_graph_relationship_query():
-    """Relationship queries should route to graph."""
-    assert classify_query("What controls implement clause 6.1.2?") == RetrievalMode.HYBRID
+    """Fulltext + graph signals → graph_vector_fulltext."""
+    result = classify_query("What controls implement clause 6.1.2?")
+    assert result == RetrievalMode.GRAPH_VECTOR_FULLTEXT
 
 
 def test_vector_conceptual_query():
@@ -36,6 +37,6 @@ def test_hybrid_short_query():
 
 
 def test_hybrid_mixed_signals():
-    """Queries with both fulltext and graph signals → hybrid."""
+    """Queries with both fulltext and graph signals → graph_vector_fulltext."""
     result = classify_query("Who owns CHG-01 and what does it implement?")
-    assert result in (RetrievalMode.HYBRID, RetrievalMode.GRAPH)
+    assert result == RetrievalMode.GRAPH_VECTOR_FULLTEXT
