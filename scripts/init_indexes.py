@@ -9,9 +9,9 @@ See DATA_REQUIREMENTS.md §5.2 for index definitions.
 import asyncio
 import sys
 
-sys.path.insert(0, ".")
+sys.path.insert(0, ".")  # noqa: E402
 
-from src.stores.neo4j_store import neo4j_store
+from src.stores.neo4j_store import neo4j_store  # noqa: E402
 
 
 async def main() -> None:

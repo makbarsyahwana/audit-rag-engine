@@ -3,8 +3,7 @@
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field  # noqa: I001
-
+from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # Evidence search

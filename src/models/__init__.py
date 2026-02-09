@@ -1,6 +1,10 @@
 """Data models for the audit RAG engine."""
 
-from src.models.chunk import ChunkMetadata, ChunkRecord, ChunkWithEmbedding
+from src.models.chunk import (  # noqa: I001
+    ChunkMetadata,
+    ChunkRecord,
+    ChunkWithEmbedding,
+)
 from src.models.document import (
     ConfidentialityLevel,
     DocType,
