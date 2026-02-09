@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 
 from src.config import settings
 from src.models.retrieval import (
@@ -16,6 +16,8 @@ from src.retrieval.hybrid import hybrid_search
 from src.retrieval.reranker import rerank
 from src.retrieval.router import classify_query
 from src.retrieval.vector import vector_search
+from src.security.prompt_guard import scan_query
+from src.security.service_auth import parse_identity, verify_engagement_access
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +25,15 @@ router = APIRouter()
 
 
 @router.post("/", response_model=RetrieveResponse)
-async def retrieve_auto(request: RetrieveRequest):
+async def retrieve_auto(request: RetrieveRequest, req: Request):
     """Auto-routed retrieval (query router selects mode)."""
+    # Security checks (ASI01 + ASI03)
+    identity = parse_identity(req)
+    verify_engagement_access(identity, request.engagement_id)
+    scan = scan_query(request.query)
+    if scan.blocked:
+        raise HTTPException(status_code=400, detail=scan.message)
+
     mode = request.mode
     if mode == RetrievalMode.AUTO:
         mode = classify_query(request.query)

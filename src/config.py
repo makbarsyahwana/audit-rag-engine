@@ -43,6 +43,27 @@ class Settings(BaseSettings):
     retrieval_top_k: int = 10
     rerank_enabled: bool = False
 
+    # Security (ASI03 — service-to-service auth)
+    service_auth_token: str = ""  # Set via SERVICE_AUTH_TOKEN env var
+
+    # Security (ASI09 — kill switch)
+    redis_url: str = "redis://localhost:6379"
+
+    # Security (ASI02 — token budget)
+    llm_request_timeout: int = 60  # seconds
+    llm_daily_token_budget: int = 0  # 0 = unlimited
+    llm_circuit_breaker_threshold: int = 5  # consecutive failures before open
+    llm_circuit_breaker_reset: int = 60  # seconds before half-open
+
+    # Security (ASI05 — file upload limits)
+    max_upload_size_mb: int = 50
+    allowed_mime_types: str = (
+        "application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,"
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation,"
+        "text/plain,text/csv,application/json,text/markdown"
+    )
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8001

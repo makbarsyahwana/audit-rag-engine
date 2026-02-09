@@ -3,11 +3,13 @@ import uuid
 from datetime import UTC, datetime
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from src.ingestion.pipeline import run_ingestion_pipeline
 from src.ingestion.task_broker import QUEUE_PROCESS, task_broker
 from src.models.document import IngestResponse, JobStatusResponse, ProcessingStatus
+from src.security.file_validator import validate_file
+from src.security.service_auth import parse_identity, verify_engagement_access
 from src.stores.document_store import document_store
 from src.stores.object_store import object_store
 
@@ -82,6 +84,7 @@ async def _enqueue_document(
 
 @router.post("/document", response_model=IngestResponse)
 async def ingest_document(
+    req: Request,
     file: UploadFile = File(...),
     engagement_id: str = Form(...),
     doc_type: str = Form("other"),
@@ -99,12 +102,25 @@ async def ingest_document(
     By default, uploads to S3 and enqueues for async processing via RabbitMQ.
     Set sync=true to process synchronously (for testing/small files).
     """
+    # Security: verify engagement access (ASI03)
+    identity = parse_identity(req)
+    verify_engagement_access(identity, engagement_id)
+
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
     file_data = await file.read()
     if not file_data:
         raise HTTPException(status_code=400, detail="Empty file")
+
+    # Security: validate file (ASI05)
+    validation = validate_file(
+        file_data=file_data,
+        filename=file.filename,
+        content_type=file.content_type or "application/octet-stream",
+    )
+    if not validation.valid:
+        raise HTTPException(status_code=400, detail=validation.reason)
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
 

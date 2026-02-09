@@ -27,6 +27,7 @@ from src.models.document import (
     DocumentRecord,
     ProcessingStatus,
 )
+from src.security.content_sanitizer import sanitize_text
 from src.stores.document_store import document_store
 from src.stores.neo4j_store import neo4j_store
 from src.stores.object_store import object_store
@@ -123,6 +124,11 @@ async def process_handler(payload: dict[str, Any]) -> None:
 
     # Chunk
     chunk_dicts = chunk_document(docling_doc)
+
+    # Sanitize chunk content (ASI06 — prevent RAG poisoning)
+    for c in chunk_dicts:
+        c["content"], _ = sanitize_text(c["content"], source_id=document_id)
+
     if not chunk_dicts:
         await document_store.update_document_status(document_id, ProcessingStatus.FAILED)
         await document_store.update_job(
