@@ -2,13 +2,14 @@
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from src.evaluation.ab_testing import ab_manager
 from src.evaluation.golden_set import get_golden_set, list_golden_sets
 from src.observability.alerts import alert_manager
 from src.observability.drift_detection import drift_detector
 from src.observability.model_cards import model_registry
+from src.security.service_auth import parse_identity
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +21,10 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 @router.get("/alerts")
-async def get_alerts(firing_only: bool = False):
+async def get_alerts(req: Request, firing_only: bool = False):
     """Get current alerts."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     if firing_only:
         return {"alerts": [a.model_dump() for a in alert_manager.get_firing()]}
     return {"alerts": [a.model_dump() for a in alert_manager.get_all()]}
@@ -32,8 +35,10 @@ async def get_alerts(firing_only: bool = False):
 # ---------------------------------------------------------------------------
 
 @router.get("/models")
-async def get_model_cards():
+async def get_model_cards(req: Request):
     """Get registered model cards."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     return {"models": model_registry.to_dict()}
 
 
@@ -42,8 +47,10 @@ async def get_model_cards():
 # ---------------------------------------------------------------------------
 
 @router.get("/drift")
-async def get_drift_status():
+async def get_drift_status(req: Request):
     """Get drift detection status and recent alerts."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     snapshot = drift_detector.get_current_snapshot()
     alerts = drift_detector.get_alerts(limit=20)
     return {
@@ -57,14 +64,18 @@ async def get_drift_status():
 # ---------------------------------------------------------------------------
 
 @router.get("/eval/golden-sets")
-async def list_available_golden_sets():
+async def list_available_golden_sets(req: Request):
     """List available golden question set domains."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     return {"domains": list_golden_sets()}
 
 
 @router.get("/eval/golden-sets/{domain}")
-async def get_golden_set_detail(domain: str):
+async def get_golden_set_detail(domain: str, req: Request):
     """Get a golden set by domain."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     gs = get_golden_set(domain)
     if not gs:
         return {"error": f"Golden set not found for domain: {domain}"}
@@ -76,14 +87,18 @@ async def get_golden_set_detail(domain: str):
 # ---------------------------------------------------------------------------
 
 @router.get("/experiments")
-async def list_experiments():
+async def list_experiments(req: Request):
     """List registered A/B experiments."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     return {
         "experiments": [e.model_dump() for e in ab_manager.list_experiments()]
     }
 
 
 @router.get("/experiments/{experiment_id}/summary")
-async def get_experiment_summary(experiment_id: str):
+async def get_experiment_summary(experiment_id: str, req: Request):
     """Get summary for an A/B experiment."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     return ab_manager.get_summary(experiment_id).model_dump()

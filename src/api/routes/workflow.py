@@ -3,7 +3,7 @@
 import logging
 import time
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 
 from src.generation.citations import extract_citations
 from src.generation.llm import invoke_llm
@@ -22,6 +22,12 @@ from src.models.workflow import (
     WorkpaperDraftResponse,
 )
 from src.retrieval.evidence import evidence_search
+from src.security.behavioral_monitor import behavioral_monitor
+from src.security.circuit_breaker import llm_circuit_breaker
+from src.security.kill_switch import kill_switch
+from src.security.output_guard import check_output
+from src.security.prompt_guard import scan_query
+from src.security.service_auth import parse_identity, verify_engagement_access
 from src.workflows.evidence_detection import detect_missing_evidence
 from src.workflows.traceability import generate_traceability_matrix
 
@@ -35,8 +41,15 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 @router.post("/evidence/search", response_model=EvidenceSearchResponse)
-async def search_evidence(request: EvidenceSearchRequest):
+async def search_evidence(request: EvidenceSearchRequest, req: Request):
     """Search for evidence with control, period, and entity filters."""
+    # Security: identity + access (ASI03) + prompt guard (ASI01)
+    identity = parse_identity(req)
+    verify_engagement_access(identity, request.engagement_id)
+    scan_result = scan_query(request.query)
+    if scan_result.blocked:
+        raise HTTPException(status_code=400, detail=f"Query blocked: {scan_result.reason}")
+
     chunks, latency_ms = await evidence_search(
         query=request.query,
         engagement_id=request.engagement_id,
@@ -75,8 +88,12 @@ async def search_evidence(request: EvidenceSearchRequest):
     "/traceability/matrix",
     response_model=TraceabilityMatrixResponse,
 )
-async def build_traceability_matrix(request: TraceabilityMatrixRequest):
+async def build_traceability_matrix(request: TraceabilityMatrixRequest, req: Request):
     """Generate a requirement-control traceability matrix."""
+    # Security: identity + access (ASI03)
+    identity = parse_identity(req)
+    verify_engagement_access(identity, request.engagement_id)
+
     return await generate_traceability_matrix(
         engagement_id=request.engagement_id,
         requirements=request.requirements,
@@ -94,8 +111,12 @@ async def build_traceability_matrix(request: TraceabilityMatrixRequest):
     "/evidence/gaps",
     response_model=MissingEvidenceResponse,
 )
-async def find_evidence_gaps(request: MissingEvidenceRequest):
+async def find_evidence_gaps(request: MissingEvidenceRequest, req: Request):
     """Detect missing or incomplete evidence for controls."""
+    # Security: identity + access (ASI03)
+    identity = parse_identity(req)
+    verify_engagement_access(identity, request.engagement_id)
+
     return await detect_missing_evidence(
         engagement_id=request.engagement_id,
         controls=request.controls,
@@ -111,8 +132,15 @@ async def find_evidence_gaps(request: MissingEvidenceRequest):
     "/draft/workpaper",
     response_model=WorkpaperDraftResponse,
 )
-async def draft_workpaper(request: WorkpaperDraftRequest):
+async def draft_workpaper(request: WorkpaperDraftRequest, req: Request):
     """Generate a workpaper narrative draft from evidence."""
+    # Security: identity + access (ASI03) + kill switch (ASI09)
+    identity = parse_identity(req)
+    verify_engagement_access(identity, request.engagement_id)
+    level = kill_switch.get_level()
+    if level != "active":
+        raise HTTPException(status_code=503, detail=f"Service in {level} mode")
+
     start = time.time()
 
     # Retrieve evidence for the workpaper topic
@@ -155,7 +183,23 @@ async def draft_workpaper(request: WorkpaperDraftRequest):
         scope=request.scope,
         control_ref=request.control_ref,
     )
-    llm_response = await invoke_llm(messages)
+
+    # Security: circuit breaker (ASI08)
+    if not llm_circuit_breaker.is_allowed():
+        raise HTTPException(status_code=503, detail="LLM service temporarily unavailable")
+    try:
+        llm_response = await invoke_llm(messages)
+        llm_circuit_breaker.record_success()
+    except Exception as exc:
+        llm_circuit_breaker.record_failure()
+        raise HTTPException(status_code=502, detail=f"LLM call failed: {exc}") from exc
+
+    # Security: output guard (ASI01/06) + behavioral monitor (ASI10)
+    output_result = check_output(llm_response, request.engagement_id)
+    if output_result.blocked:
+        logger.warning("Output blocked in workpaper draft: %s", output_result.reason)
+        llm_response = "[Output blocked by security controls. Please retry or contact admin.]"
+    behavioral_monitor.record(len(llm_response), 0.0)
 
     # Extract citations and confidence
     from src.models.retrieval import RetrievedChunk
@@ -195,8 +239,15 @@ async def draft_workpaper(request: WorkpaperDraftRequest):
     "/draft/finding",
     response_model=FindingDraftResponse,
 )
-async def draft_finding(request: FindingDraftRequest):
+async def draft_finding(request: FindingDraftRequest, req: Request):
     """Generate a finding draft from evidence."""
+    # Security: identity + access (ASI03) + kill switch (ASI09)
+    identity = parse_identity(req)
+    verify_engagement_access(identity, request.engagement_id)
+    level = kill_switch.get_level()
+    if level != "active":
+        raise HTTPException(status_code=503, detail=f"Service in {level} mode")
+
     start = time.time()
 
     # Retrieve evidence for the finding topic
@@ -241,7 +292,23 @@ async def draft_finding(request: FindingDraftRequest):
         control_ref=request.control_ref,
         observation=request.observation,
     )
-    llm_response = await invoke_llm(messages)
+
+    # Security: circuit breaker (ASI08)
+    if not llm_circuit_breaker.is_allowed():
+        raise HTTPException(status_code=503, detail="LLM service temporarily unavailable")
+    try:
+        llm_response = await invoke_llm(messages)
+        llm_circuit_breaker.record_success()
+    except Exception as exc:
+        llm_circuit_breaker.record_failure()
+        raise HTTPException(status_code=502, detail=f"LLM call failed: {exc}") from exc
+
+    # Security: output guard (ASI01/06) + behavioral monitor (ASI10)
+    output_result = check_output(llm_response, request.engagement_id)
+    if output_result.blocked:
+        logger.warning("Output blocked in finding draft: %s", output_result.reason)
+        llm_response = "[Output blocked by security controls. Please retry or contact admin.]"
+    behavioral_monitor.record(len(llm_response), 0.0)
 
     # Extract citations, confidence, and suggested severity
     from src.models.retrieval import RetrievedChunk

@@ -180,6 +180,7 @@ async def ingest_document(
 
 @router.post("/batch")
 async def ingest_batch(
+    req: Request,
     files: list[UploadFile] = File(...),
     engagement_id: str = Form(...),
     doc_type: str = Form("other"),
@@ -190,12 +191,27 @@ async def ingest_batch(
     By default, enqueues all files for async processing via RabbitMQ.
     Set sync=true to process synchronously.
     """
+    # Security: verify engagement access (ASI03)
+    identity = parse_identity(req)
+    verify_engagement_access(identity, engagement_id)
+
     results = []
+    skipped = []
     for file in files:
         if not file.filename:
             continue
         file_data = await file.read()
         if not file_data:
+            continue
+
+        # Security: validate each file (ASI05)
+        validation = validate_file(
+            file_data=file_data,
+            filename=file.filename,
+            content_type=file.content_type or "application/octet-stream",
+        )
+        if not validation.valid:
+            skipped.append({"filename": file.filename, "reason": validation.reason})
             continue
 
         if sync:
@@ -222,6 +238,7 @@ async def ingest_batch(
         "completed": sum(1 for r in results if r.get("status") == "completed"),
         "failed": sum(1 for r in results if r.get("status") == "failed"),
         "duplicates": sum(1 for r in results if r.get("status") == "duplicate"),
+        "skipped": skipped,
         "results": results,
     }
 

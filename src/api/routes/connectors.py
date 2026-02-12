@@ -3,11 +3,12 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from src.connectors.base import ConnectorConfig, ConnectorType
 from src.connectors.sync_manager import get_freshness_report, sync_manager
+from src.security.service_auth import parse_identity, verify_engagement_access
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +52,18 @@ class SyncResponse(BaseModel):
 
 
 @router.get("/connectors")
-async def list_connectors():
+async def list_connectors(req: Request):
     """List all registered connectors."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     return sync_manager.list_connectors()
 
 
 @router.post("/connectors")
-async def register_connector(req: RegisterConnectorRequest):
+async def register_connector(req: RegisterConnectorRequest, request: Request):
     """Register a new connector."""
+    # Security: identity verification — admin-level operation (ASI03)
+    parse_identity(request)
     config = ConnectorConfig(**req.model_dump())
 
     # Create the appropriate connector instance
@@ -70,8 +75,10 @@ async def register_connector(req: RegisterConnectorRequest):
 
 
 @router.delete("/connectors/{connector_id}")
-async def unregister_connector(connector_id: str):
+async def unregister_connector(connector_id: str, req: Request):
     """Unregister a connector."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     parts = connector_id.split(":", 1)
     if len(parts) != 2:
         raise HTTPException(400, "Invalid connector_id format (type:name)")
@@ -81,8 +88,10 @@ async def unregister_connector(connector_id: str):
 
 
 @router.post("/connectors/{connector_id}/test")
-async def test_connector(connector_id: str):
+async def test_connector(connector_id: str, req: Request):
     """Test a connector's connection."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     connector = sync_manager.get_connector(connector_id)
     if not connector:
         raise HTTPException(404, f"Connector not found: {connector_id}")
@@ -106,8 +115,11 @@ async def test_connector(connector_id: str):
 
 
 @router.post("/connectors/{connector_id}/sync", response_model=SyncResponse)
-async def run_sync(connector_id: str, req: SyncRequest):
+async def run_sync(connector_id: str, req: SyncRequest, request: Request):
     """Trigger a sync for a connector."""
+    # Security: identity + engagement access (ASI03)
+    identity = parse_identity(request)
+    verify_engagement_access(identity, req.engagement_id)
     try:
         state = await sync_manager.run_sync(
             connector_id=connector_id,
@@ -131,8 +143,10 @@ async def run_sync(connector_id: str, req: SyncRequest):
 
 
 @router.get("/connectors/sync-states")
-async def list_sync_states(engagement_id: Optional[str] = None):
+async def list_sync_states(req: Request, engagement_id: Optional[str] = None):
     """Get sync states for all connectors."""
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     states = await sync_manager.get_all_sync_states(engagement_id)
     return [s.model_dump(mode="json") for s in states]
 
@@ -143,11 +157,13 @@ async def list_sync_states(engagement_id: Optional[str] = None):
 
 
 @router.get("/connectors/freshness")
-async def freshness_report(engagement_id: Optional[str] = None):
+async def freshness_report(req: Request, engagement_id: Optional[str] = None):
     """Get freshness report for all connectors.
 
     Shows staleness metrics and whether connectors are overdue for sync.
     """
+    # Security: identity verification (ASI03)
+    parse_identity(req)
     return await get_freshness_report(engagement_id)
 
 

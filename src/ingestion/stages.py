@@ -27,6 +27,7 @@ from src.models.document import (
     DocumentRecord,
     ProcessingStatus,
 )
+from src.security.circuit_breaker import llm_circuit_breaker
 from src.security.content_sanitizer import sanitize_text
 from src.stores.document_store import document_store
 from src.stores.neo4j_store import neo4j_store
@@ -257,13 +258,30 @@ async def extract_handler(payload: dict[str, Any]) -> None:
         chunk_id = chunk_info["chunk_id"]
         chunk_text = chunk_info["content"]
 
-        result = await extract_entities_and_relationships(
-            chunk_text=chunk_text,
-            chunk_id=chunk_id,
-            document_id=document_id,
-            engagement_id=engagement_id,
-            confidentiality_level=confidentiality_level,
-        )
+        # Security: circuit breaker for LLM calls (ASI08)
+        if not llm_circuit_breaker.is_allowed():
+            logger.warning(
+                "Circuit breaker OPEN — skipping entity extraction: job=%s, chunk=%s",
+                job_id, chunk_id,
+            )
+            continue
+
+        try:
+            result = await extract_entities_and_relationships(
+                chunk_text=chunk_text,
+                chunk_id=chunk_id,
+                document_id=document_id,
+                engagement_id=engagement_id,
+                confidentiality_level=confidentiality_level,
+            )
+            llm_circuit_breaker.record_success()
+        except Exception as exc:
+            llm_circuit_breaker.record_failure()
+            logger.warning(
+                "LLM extraction failed (circuit breaker recorded): job=%s, chunk=%s, error=%s",
+                job_id, chunk_id, exc,
+            )
+            continue
 
         for entity in result.entities:
             all_entities.append(entity.model_dump())
