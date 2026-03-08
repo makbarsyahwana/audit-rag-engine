@@ -41,6 +41,7 @@ class RetrieveRequest(BaseModel):
     top_k: int = 10
     filters: RetrievalFilters = Field(default_factory=RetrievalFilters)
     graph_expansion: GraphExpansion = Field(default_factory=GraphExpansion)
+    app_mode: str = "audit"  # "audit" | "legal" | "compliance"
 
 
 class RelatedEntity(BaseModel):
@@ -85,6 +86,7 @@ class GenerateRequest(BaseModel):
     top_k: int = 10
     filters: RetrievalFilters = Field(default_factory=RetrievalFilters)
     graph_expansion: GraphExpansion = Field(default_factory=GraphExpansion)
+    app_mode: str = "audit"  # "audit" | "legal" | "compliance"
 
 
 class Citation(BaseModel):

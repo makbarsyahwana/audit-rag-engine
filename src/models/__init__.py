@@ -36,6 +36,15 @@ from src.models.retrieval import (
     RetrieveResponse,
     RetrievedChunk,
 )
+from src.models.rlm import (
+    RlmExecuteRequest,
+    RlmExecuteResponse,
+    RlmIteration,
+    RlmStatus,
+    RlmSubCall,
+    RlmToolCall,
+    RlmTrace,
+)
 
 __all__ = [
     "ChunkMetadata",
@@ -65,5 +74,12 @@ __all__ = [
     "RetrieveRequest",
     "RetrieveResponse",
     "RetrievedChunk",
+    "RlmExecuteRequest",
+    "RlmExecuteResponse",
+    "RlmIteration",
+    "RlmStatus",
+    "RlmSubCall",
+    "RlmToolCall",
+    "RlmTrace",
     "SourceSystem",
 ]
