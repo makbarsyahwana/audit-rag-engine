@@ -4,7 +4,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from src.api.routes import connectors, generate, health, ingest, observability, retrieve, workflow
+from src.api.routes import (
+    connectors,
+    generate,
+    health,
+    ingest,
+    observability,
+    retrieve,
+    rlm,
+    workflow,
+)
 from src.ingestion.task_broker import task_broker
 from src.observability.logging import setup_logging
 from src.observability.metrics import add_metrics_middleware
@@ -101,6 +110,7 @@ app.include_router(health.router, tags=["health"])
 app.include_router(ingest.router, prefix="/ingest", tags=["ingestion"])
 app.include_router(retrieve.router, prefix="/retrieve", tags=["retrieval"])
 app.include_router(generate.router, prefix="/generate", tags=["generation"])
+app.include_router(rlm.router, prefix="/rlm", tags=["rlm"])
 app.include_router(workflow.router, prefix="/workflow", tags=["workflow"])
 app.include_router(observability.router, prefix="/ops", tags=["observability"])
 app.include_router(connectors.router, prefix="/connectors", tags=["connectors"])

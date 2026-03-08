@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from src.config import settings
 from src.generation.citations import check_abstention, extract_citations
 from src.generation.llm import invoke_llm
-from src.generation.prompts.qa import build_qa_messages
+from src.generation.prompts.prompt_router import get_qa_builder
 from src.models.retrieval import (
     GenerateRequest,
     GenerateResponse,
@@ -177,7 +177,8 @@ async def generate_answer(request: GenerateRequest, req: Request):
                 for e in c.related_entities if e.name
             ]
         chunk_dicts.append(d)
-    messages = build_qa_messages(request.query, chunk_dicts)
+    build_messages = get_qa_builder(request.app_mode)
+    messages = build_messages(request.query, chunk_dicts)
     try:
         llm_response = await invoke_llm(messages)
         llm_circuit_breaker.record_success()
