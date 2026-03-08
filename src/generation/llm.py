@@ -1,13 +1,15 @@
 """LLM client wrapper for generation (OpenAI/Anthropic)."""
 
 import logging
-from typing import Optional
+from typing import Literal, Optional
 
 from langchain_openai import ChatOpenAI
 
 from src.config import settings
 
 logger = logging.getLogger(__name__)
+
+ModelTier = Literal["small", "mid", "frontier"]
 
 _llm_client: Optional[ChatOpenAI] = None
 
@@ -50,6 +52,88 @@ def get_llm_client(
 
     logger.info("LLM client created (model=%s, temperature=%.2f)", _model, _temperature)
     return client
+
+
+def resolve_tier_config(tier: ModelTier) -> dict[str, str]:
+    """Resolve model name, base_url, and api_key for a given tier.
+
+    Falls back through the tier chain: tier-specific → llm_model defaults.
+
+    Returns:
+        Dict with keys: model, base_url, api_key.
+    """
+    if tier == "small":
+        model = settings.small_model_name or settings.llm_model
+        base_url = settings.small_model_base_url or None
+        api_key = settings.small_model_api_key or settings.openai_api_key
+    elif tier == "mid":
+        model = settings.mid_model_name or settings.llm_model
+        base_url = settings.mid_model_base_url or None
+        api_key = settings.mid_model_api_key or settings.openai_api_key
+    elif tier == "frontier":
+        model = settings.frontier_model_name or settings.llm_model
+        base_url = settings.frontier_model_base_url or None
+        api_key = settings.frontier_model_api_key or settings.openai_api_key
+    else:
+        model = settings.llm_model
+        base_url = None
+        api_key = settings.openai_api_key
+
+    return {"model": model, "base_url": base_url, "api_key": api_key}
+
+
+def get_llm_client_by_tier(
+    tier: ModelTier,
+    temperature: Optional[float] = None,
+) -> ChatOpenAI:
+    """Get an LLM client configured for the specified model tier.
+
+    Args:
+        tier: One of 'small', 'mid', 'frontier'.
+        temperature: Override temperature (default from settings).
+
+    Returns:
+        ChatOpenAI instance configured for the tier.
+    """
+    cfg = resolve_tier_config(tier)
+    _temperature = temperature if temperature is not None else settings.llm_temperature
+
+    kwargs: dict = {
+        "model": cfg["model"],
+        "temperature": _temperature,
+        "openai_api_key": cfg["api_key"],
+    }
+    if cfg["base_url"]:
+        kwargs["openai_api_base"] = cfg["base_url"]
+
+    client = ChatOpenAI(**kwargs)
+    logger.info(
+        "Tier LLM client created (tier=%s, model=%s, base_url=%s)",
+        tier,
+        cfg["model"],
+        cfg["base_url"] or "default",
+    )
+    return client
+
+
+async def invoke_llm_by_tier(
+    messages: list[dict[str, str]],
+    tier: ModelTier,
+    temperature: Optional[float] = None,
+) -> str:
+    """Invoke an LLM at the specified tier.
+
+    Args:
+        messages: List of message dicts with "role" and "content" keys.
+        tier: One of 'small', 'mid', 'frontier'.
+        temperature: Override temperature.
+
+    Returns:
+        The LLM response content string.
+    """
+    client = get_llm_client_by_tier(tier=tier, temperature=temperature)
+    response = await client.ainvoke(messages)
+    return response.content
 
 
 async def invoke_llm(
