@@ -1,18 +1,16 @@
 """RabbitMQ-based task broker for async ingestion pipeline.
 
 Provides publish/consume helpers with stage-based queues,
-dead-letter exchange, and retry logic using aio-pika.
+dead-letter exchange, and retry logic using our in-house AMQP client.
 """
 
 import json
 import logging
 from typing import Any, Callable, Optional
 
-import aio_pika
-from aio_pika import DeliveryMode, ExchangeType, Message
-from aio_pika.abc import AbstractChannel, AbstractConnection
-
 from src.config import settings
+from src.lib.amqp import DeliveryMode, ExchangeType, Message, connect_robust
+from src.lib.amqp.client import Channel, Connection
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +32,12 @@ class TaskBroker:
     """Async RabbitMQ task broker for pipeline stages."""
 
     def __init__(self) -> None:
-        self._connection: Optional[AbstractConnection] = None
-        self._channel: Optional[AbstractChannel] = None
+        self._connection: Optional[Connection] = None
+        self._channel: Optional[Channel] = None
 
     async def connect(self) -> None:
         """Connect to RabbitMQ and declare exchanges/queues."""
-        self._connection = await aio_pika.connect_robust(settings.rabbitmq_url)
+        self._connection = await connect_robust(settings.rabbitmq_url)
         self._channel = await self._connection.channel()
         await self._channel.set_qos(prefetch_count=1)
 
@@ -69,7 +67,7 @@ class TaskBroker:
             logger.info("TaskBroker connection closed")
 
     @property
-    def channel(self) -> AbstractChannel:
+    def channel(self) -> Channel:
         if self._channel is None:
             raise RuntimeError("TaskBroker not connected. Call connect() first.")
         return self._channel
@@ -125,8 +123,9 @@ class TaskBroker:
             queue_name, durable=True, passive=True
         )
 
-        async with queue.iterator() as queue_iter:
-            async for message in queue_iter:
+        queue_iter = await queue.iterator()
+        async with queue_iter as qi:
+            async for message in qi:
                 async with message.process(requeue=False):
                     retry_count = (message.headers or {}).get("x-retry-count", 0)
                     try:
