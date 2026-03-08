@@ -10,16 +10,23 @@ Document ingestion, hybrid retrieval, and LLM generation service for the AI Audi
 - **MongoDB** — document & chunk storage
 - **MinIO / S3** — original file storage
 - **LangChain** + **OpenAI** — embeddings & generation
+- **RestrictedPython** — sandboxed code execution for RLM engine
+- **RabbitMQ** — async ingestion via custom `src/lib/amqp` client
 - **OpenTelemetry** — distributed tracing & metrics
 - **Prometheus** — metrics export
 
 ## Features
 
-- **Ingestion Pipeline**: Docling convert → HybridChunker → embed → Neo4j + MongoDB upsert
+- **Ingestion Pipeline**: Docling convert → HybridChunker → embed → Neo4j + MongoDB upsert (async via RabbitMQ)
 - **Knowledge Graph Extraction**: LLM-based entity/relationship extraction with audit-domain schema
-- **Hybrid Retrieval**: vector, fulltext, graph, and combined hybrid modes with query routing & reranking
+- **Hybrid Retrieval**: 6 modes (vector, fulltext, graph, hybrid, entity_vector, graph_vector_fulltext) with query routing & reranking
 - **Generation**: LLM Q&A with citation extraction, confidence scoring, and abstention detection
-- **Workflow Support**: prompt templates for workpaper/finding drafting, evidence search, traceability matrix
+- **Multi-Mode Prompts**: Mode-aware prompt routing for Audit, Legal, and Compliance modes
+- **Workflow Support**: prompt templates for workpaper/finding drafting (audit), legal memo/issue analysis (legal), gap analysis/compliance findings (compliance)
+- **RLM Engine**: Recursive Language Model with sandboxed REPL, sub_RLM recursion, and mode-aware context
+- **Multi-Model Tier Routing**: small (🟢 classification), mid (🟡 planner/critic), frontier (🔴 synthesis) model selection
+- **OWASP Security**: 12 defense-in-depth modules (prompt guard, output guard, kill switch, circuit breaker, token budget, etc.)
+- **Custom AMQP Client**: In-house async RabbitMQ client replacing aio-pika
 - **Observability**: structured JSON logging, Prometheus metrics, OpenTelemetry tracing, model cards
 
 ## Getting Started
@@ -58,29 +65,25 @@ Once running, visit [http://localhost:8001/docs](http://localhost:8001/docs) for
 
 ```
 src/
-├── api/
-│   ├── routes/          # FastAPI route handlers
-│   │   ├── health.py    # Health check
-│   │   ├── ingest.py    # Document ingestion endpoints
-│   │   ├── retrieve.py  # Retrieval endpoints (vector/fulltext/graph/hybrid)
-│   │   ├── generate.py  # LLM generation with citations
-│   │   ├── workflow.py  # Workflow support endpoints
-│   │   └── observability.py  # Ops & metrics endpoints
-│   └── deps.py          # Dependency injection
-├── ingestion/
-│   ├── pipeline.py      # Main ingestion pipeline orchestration
-│   ├── converter.py     # Docling DocumentConverter wrapper
-│   ├── chunker.py       # Docling HybridChunker
-│   ├── embedder.py      # Embedding generation
-│   ├── enrichments.py   # Multimodal enrichments config
-│   └── connectors/      # Source connectors
-├── retrieval/           # Retrieval modes and query routing
-├── generation/          # LLM generation with citations
-├── graph/               # Knowledge graph extraction
-├── stores/              # Database clients (Neo4j, MongoDB, S3)
-├── models/              # Pydantic models
-├── observability/       # Logging, metrics, tracing, model cards
-└── main.py              # FastAPI application entry point
+├── api/routes/              # FastAPI route handlers
+│   ├── ingest.py            # Ingestion (async via RabbitMQ)
+│   ├── retrieve.py          # 6 retrieval modes
+│   ├── generate.py          # Mode-aware generation with citations
+│   ├── rlm.py               # RLM deep-analysis endpoint
+│   └── health.py            # Health + kill switch + prompt integrity
+├── ingestion/               # Docling pipeline + async stages
+├── connectors/              # Source connectors (SharePoint, GRC, upload)
+├── retrieval/               # 6 retrieval modes + query router + reranker
+├── generation/              # LLM client + mode-aware prompts + citations
+│   └── prompts/             # Audit, Legal, Compliance prompt templates
+├── graph/                   # Entity/relationship extraction + KG schema
+├── stores/                  # Neo4j, MongoDB, S3/MinIO clients
+├── models/                  # Pydantic request/response models
+├── rlm/                     # Recursive Language Model engine + sandbox
+├── security/                # 12 OWASP ASI defense-in-depth modules
+├── lib/amqp/                # Custom async AMQP client
+├── config.py                # Pydantic settings (env, tiers, security)
+└── main.py                  # FastAPI entry point
 ```
 
 ## Testing
