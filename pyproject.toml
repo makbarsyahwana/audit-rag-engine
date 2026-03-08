@@ -22,9 +22,10 @@ dependencies = [
     "pymongo>=4.6.0",
     "motor>=3.3.0",
     "boto3>=1.34.0",
-    # Message queue & cache
-    "aio-pika>=9.4.0",
+    # Cache
     "redis>=5.0.0",
+    # RLM sandbox
+    "RestrictedPython>=7.0",
     # Utilities
     "python-multipart>=0.0.6",
     "httpx>=0.26.0",
