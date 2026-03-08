@@ -64,6 +64,29 @@ class Settings(BaseSettings):
         "text/plain,text/csv,application/json,text/markdown"
     )
 
+    # Model tiers — multi-model routing
+    # 🟢 Small tier (classification, sub_RLM leaf calls)
+    small_model_name: str = ""  # e.g. "qwen3-8b"; empty = use llm_model
+    small_model_base_url: str = ""  # e.g. "http://localhost:8080/v1"; empty = use OpenAI
+    small_model_api_key: str = ""  # empty = use openai_api_key
+    # 🟡 Mid tier (planner, RLM controller, critic)
+    mid_model_name: str = ""  # e.g. "deepseek-v3"; empty = use llm_model
+    mid_model_base_url: str = ""  # empty = use OpenAI
+    mid_model_api_key: str = ""  # empty = use openai_api_key
+    # 🔴 Frontier tier (synthesis, final polish)
+    frontier_model_name: str = ""  # e.g. "claude-sonnet-4-20250514"; empty = use llm_model
+    frontier_model_base_url: str = ""  # empty = use OpenAI
+    frontier_model_api_key: str = ""  # empty = use openai_api_key
+
+    # RLM (Recursive Language Model) engine
+    rlm_max_iterations: int = 15
+    rlm_max_depth: int = 3
+    rlm_max_sub_calls: int = 50
+    rlm_code_timeout_seconds: int = 30
+    rlm_controller_model: str = ""  # 🟡 mid-tier; empty = use mid_model_name or llm_model
+    rlm_sub_model: str = ""  # 🟢 small; empty = use small_model_name or llm_model
+    rlm_synthesis_model: str = ""  # 🔴 frontier; empty = use frontier_model_name or llm_model
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8001
