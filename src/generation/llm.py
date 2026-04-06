@@ -1,4 +1,4 @@
-"""LLM client wrapper for generation (OpenAI/Anthropic)."""
+"""LLM client wrapper for generation."""
 
 import logging
 from typing import Literal, Optional
@@ -6,6 +6,7 @@ from typing import Literal, Optional
 from langchain_openai import ChatOpenAI
 
 from src.config import settings
+from src.generation.provider_factory import build_chat_model
 
 logger = logging.getLogger(__name__)
 
@@ -55,31 +56,37 @@ def get_llm_client(
 
 
 def resolve_tier_config(tier: ModelTier) -> dict[str, str]:
-    """Resolve model name, base_url, and api_key for a given tier.
+    """Resolve provider, model name, base_url, and api_key for a given tier.
 
-    Falls back through the tier chain: tier-specific → llm_model defaults.
+    API key fallback chain: tier-specific key → openrouter_api_key → openai_api_key.
 
     Returns:
-        Dict with keys: model, base_url, api_key.
+        Dict with keys: provider, model, base_url, api_key.
     """
+    _fallback_key = settings.openrouter_api_key or settings.openai_api_key
+
     if tier == "small":
+        provider = settings.small_model_provider
         model = settings.small_model_name or settings.llm_model
         base_url = settings.small_model_base_url or None
-        api_key = settings.small_model_api_key or settings.openai_api_key
+        api_key = settings.small_model_api_key or _fallback_key
     elif tier == "mid":
+        provider = settings.mid_model_provider
         model = settings.mid_model_name or settings.llm_model
         base_url = settings.mid_model_base_url or None
-        api_key = settings.mid_model_api_key or settings.openai_api_key
+        api_key = settings.mid_model_api_key or _fallback_key
     elif tier == "frontier":
+        provider = settings.frontier_model_provider
         model = settings.frontier_model_name or settings.llm_model
         base_url = settings.frontier_model_base_url or None
-        api_key = settings.frontier_model_api_key or settings.openai_api_key
+        api_key = settings.frontier_model_api_key or _fallback_key
     else:
+        provider = "openai_compatible"
         model = settings.llm_model
         base_url = None
-        api_key = settings.openai_api_key
+        api_key = _fallback_key
 
-    return {"model": model, "base_url": base_url, "api_key": api_key}
+    return {"provider": provider, "model": model, "base_url": base_url, "api_key": api_key}
 
 
 def get_llm_client_by_tier(
@@ -93,23 +100,22 @@ def get_llm_client_by_tier(
         temperature: Override temperature (default from settings).
 
     Returns:
-        ChatOpenAI instance configured for the tier.
+        BaseChatModel instance for the tier (currently always ChatOpenAI).
     """
     cfg = resolve_tier_config(tier)
     _temperature = temperature if temperature is not None else settings.llm_temperature
 
-    kwargs: dict = {
-        "model": cfg["model"],
-        "temperature": _temperature,
-        "openai_api_key": cfg["api_key"],
-    }
-    if cfg["base_url"]:
-        kwargs["openai_api_base"] = cfg["base_url"]
-
-    client = ChatOpenAI(**kwargs)
+    client = build_chat_model(
+        provider=cfg["provider"],
+        model=cfg["model"],
+        base_url=cfg["base_url"],
+        api_key=cfg["api_key"],
+        temperature=_temperature,
+    )
     logger.info(
-        "Tier LLM client created (tier=%s, model=%s, base_url=%s)",
+        "Tier LLM client created (tier=%s, provider=%s, model=%s, base_url=%s)",
         tier,
+        cfg["provider"],
         cfg["model"],
         cfg["base_url"] or "default",
     )

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     entity_extraction_enabled: bool = True
     entity_embedding_enabled: bool = True
 
+    # Corpus scope — external/internal document separation
+    global_engagement_id: str = "__global__"  # Reserved engagement for external/public documents
+
     # Retrieval defaults
     retrieval_top_k: int = 10
     rerank_enabled: bool = False
@@ -64,19 +67,30 @@ class Settings(BaseSettings):
         "text/plain,text/csv,application/json,text/markdown"
     )
 
+    # Provider abstraction — shared convenience key (OpenRouter / any single-key gateway)
+    openrouter_api_key: str = ""  # fallback for all tier api_keys when tier key is empty
+
     # Model tiers — multi-model routing
     # 🟢 Small tier (classification, sub_RLM leaf calls)
-    small_model_name: str = ""  # e.g. "qwen3-8b"; empty = use llm_model
-    small_model_base_url: str = ""  # e.g. "http://localhost:8080/v1"; empty = use OpenAI
-    small_model_api_key: str = ""  # empty = use openai_api_key
+    small_model_provider: str = "openai_compatible"  # openai_compatible | anthropic | google | ollama  # noqa: E501
+    small_model_name: str = ""  # e.g. "qwen/qwen3-8b"; empty = use llm_model
+    small_model_base_url: str = ""  # e.g. "https://openrouter.ai/api/v1"; empty = use OpenAI
+    small_model_api_key: str = ""  # empty = openrouter_api_key → openai_api_key
     # 🟡 Mid tier (planner, RLM controller, critic)
-    mid_model_name: str = ""  # e.g. "deepseek-v3"; empty = use llm_model
+    mid_model_provider: str = "openai_compatible"
+    mid_model_name: str = ""  # e.g. "deepseek/deepseek-chat-v3-0324"; empty = use llm_model
     mid_model_base_url: str = ""  # empty = use OpenAI
-    mid_model_api_key: str = ""  # empty = use openai_api_key
+    mid_model_api_key: str = ""  # empty = openrouter_api_key → openai_api_key
     # 🔴 Frontier tier (synthesis, final polish)
-    frontier_model_name: str = ""  # e.g. "claude-sonnet-4-20250514"; empty = use llm_model
+    frontier_model_provider: str = "openai_compatible"
+    frontier_model_name: str = ""  # e.g. "anthropic/claude-sonnet-4-5"; empty = use llm_model
     frontier_model_base_url: str = ""  # empty = use OpenAI
-    frontier_model_api_key: str = ""  # empty = use openai_api_key
+    frontier_model_api_key: str = ""  # empty = openrouter_api_key → openai_api_key
+
+    # Embeddings provider (OpenAI-compatible or future native)
+    embedding_provider: str = "openai_compatible"
+    embedding_base_url: str = ""  # e.g. "https://openrouter.ai/api/v1"
+    embedding_api_key: str = ""  # empty = openrouter_api_key → openai_api_key
 
     # RLM (Recursive Language Model) engine
     rlm_max_iterations: int = 15

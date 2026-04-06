@@ -3,28 +3,42 @@
 import logging
 from typing import Optional
 
-from langchain_openai import OpenAIEmbeddings
+from langchain_core.embeddings import Embeddings
 
 from src.config import settings
+from src.generation.provider_factory import build_embeddings
 
 logger = logging.getLogger(__name__)
 
-_embeddings_client: Optional[OpenAIEmbeddings] = None
+_embeddings_client: Optional[Embeddings] = None
 
 
-def get_embeddings_client() -> OpenAIEmbeddings:
-    """Get or create the OpenAI embeddings client (singleton)."""
+def get_embeddings_client() -> Embeddings:
+    """Get or create the embeddings client (singleton).
+
+    Provider is determined by ``EMBEDDING_PROVIDER`` (default: openai_compatible).
+    API key fallback chain: EMBEDDING_API_KEY → OPENROUTER_API_KEY → OPENAI_API_KEY.
+    """
     global _embeddings_client
     if _embeddings_client is None:
-        _embeddings_client = OpenAIEmbeddings(
+        _api_key = (
+            settings.embedding_api_key
+            or settings.openrouter_api_key
+            or settings.openai_api_key
+        )
+        _embeddings_client = build_embeddings(
+            provider=settings.embedding_provider,
             model=settings.embedding_model,
+            base_url=settings.embedding_base_url or None,
+            api_key=_api_key,
             dimensions=settings.embedding_dimensions,
-            openai_api_key=settings.openai_api_key,
         )
         logger.info(
-            "Embeddings client created (model=%s, dims=%d)",
+            "Embeddings client created (provider=%s, model=%s, dims=%d, base_url=%s)",
+            settings.embedding_provider,
             settings.embedding_model,
             settings.embedding_dimensions,
+            settings.embedding_base_url or "default",
         )
     return _embeddings_client
 
