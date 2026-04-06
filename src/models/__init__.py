@@ -7,6 +7,7 @@ from src.models.chunk import (  # noqa: I001
 )
 from src.models.document import (
     ConfidentialityLevel,
+    CorpusScope,
     DocType,
     DocumentACL,
     DocumentMetadata,
@@ -52,6 +53,7 @@ __all__ = [
     "ChunkWithEmbedding",
     "Citation",
     "ConfidentialityLevel",
+    "CorpusScope",
     "DocType",
     "DocumentACL",
     "DocumentMetadata",

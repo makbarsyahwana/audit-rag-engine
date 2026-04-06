@@ -29,6 +29,7 @@ from src.lib.amqp._protocol import (
     METH_CONNECTION_OPEN_OK,
     METH_CONNECTION_START,
     METH_CONNECTION_TUNE,
+    METH_CONNECTION_TUNE_OK,
     METH_EXCHANGE_DECLARE_OK,
     METH_QUEUE_BIND_OK,
     METH_QUEUE_DECLARE_OK,
@@ -156,7 +157,7 @@ class Connection:
             heartbeat=self._heartbeat,
         )
         self._writer.write(
-            encode_method_frame(0, CLS_CONNECTION, 21, args)
+            encode_method_frame(0, CLS_CONNECTION, METH_CONNECTION_TUNE_OK, args)
         )
         await self._writer.drain()
 

@@ -34,6 +34,11 @@ class ProcessingStatus(str, Enum):
     FAILED = "failed"
 
 
+class CorpusScope(str, Enum):
+    GLOBAL = "global"          # External — shared across all engagements
+    ENGAGEMENT = "engagement"  # Internal — scoped to a single engagement
+
+
 class SourceSystem(str, Enum):
     UPLOAD = "upload"
     SHAREPOINT = "sharepoint"
@@ -75,6 +80,7 @@ class DocumentRecord(BaseModel):
     mime_type: Optional[str] = None
     file_size: Optional[int] = None
     doc_type: DocType = DocType.OTHER
+    corpus_scope: CorpusScope = CorpusScope.ENGAGEMENT
     confidentiality_level: ConfidentialityLevel = ConfidentialityLevel.INTERNAL
     metadata: DocumentMetadata = Field(default_factory=DocumentMetadata)
     acl: DocumentACL = Field(default_factory=DocumentACL)
@@ -94,6 +100,7 @@ class IngestRequest(BaseModel):
 
     engagement_id: str
     doc_type: DocType = DocType.OTHER
+    corpus_scope: CorpusScope = CorpusScope.ENGAGEMENT
     confidentiality_level: ConfidentialityLevel = ConfidentialityLevel.INTERNAL
     source_system: SourceSystem = SourceSystem.UPLOAD
     title: Optional[str] = None

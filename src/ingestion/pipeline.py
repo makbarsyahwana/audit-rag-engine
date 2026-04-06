@@ -41,6 +41,7 @@ async def run_ingestion_pipeline(
     filename: str,
     engagement_id: str,
     doc_type: str = "other",
+    corpus_scope: str = "engagement",
     confidentiality_level: str = "internal",
     source_system: str = "upload",
     title: Optional[str] = None,
@@ -116,6 +117,7 @@ async def run_ingestion_pipeline(
             mime_type=content_type,
             file_size=len(file_data),
             doc_type=doc_type,
+            corpus_scope=corpus_scope,
             confidentiality_level=confidentiality_level,
             metadata=DocumentMetadata(
                 title=title or filename,

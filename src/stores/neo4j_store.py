@@ -10,6 +10,21 @@ from src.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _engagement_scope(engagement_id: str) -> list[str]:
+    """Build the engagement scope list for retrieval queries.
+
+    Always includes both the client's engagement_id and the global
+    engagement_id so that external/public documents are searched
+    alongside client-specific documents.
+    """
+    from src.config import settings
+
+    scope = [engagement_id]
+    if engagement_id != settings.global_engagement_id:
+        scope.append(settings.global_engagement_id)
+    return scope
+
+
 class Neo4jStore:
     """Async Neo4j driver wrapper for vector, fulltext, and graph operations."""
 
@@ -229,7 +244,7 @@ class Neo4jStore:
         doc_types: Optional[list[str]] = None,
     ) -> list[dict[str, Any]]:
         """Vector similarity search over chunk embeddings."""
-        where_clause = "WHERE chunk.engagement_id = $engagement_id"
+        where_clause = "WHERE chunk.engagement_id IN $engagement_ids"
         if doc_types:
             where_clause += " AND chunk.doc_type IN $doc_types"
 
@@ -244,7 +259,7 @@ class Neo4jStore:
         """
         params: dict[str, Any] = {
             "query_embedding": query_embedding,
-            "engagement_id": engagement_id,
+            "engagement_ids": _engagement_scope(engagement_id),
             "top_k": top_k,
         }
         if doc_types:
@@ -267,7 +282,7 @@ class Neo4jStore:
         doc_types: Optional[list[str]] = None,
     ) -> list[dict[str, Any]]:
         """Fulltext (keyword) search over chunk content."""
-        where_clause = "WHERE chunk.engagement_id = $engagement_id"
+        where_clause = "WHERE chunk.engagement_id IN $engagement_ids"
         if doc_types:
             where_clause += " AND chunk.doc_type IN $doc_types"
 
@@ -282,7 +297,7 @@ class Neo4jStore:
         """
         params: dict[str, Any] = {
             "query_text": query_text,
-            "engagement_id": engagement_id,
+            "engagement_ids": _engagement_scope(engagement_id),
             "top_k": top_k,
         }
         if doc_types:
@@ -308,7 +323,7 @@ class Neo4jStore:
         query = """
         CALL db.index.fulltext.queryNodes('entity_fulltext', $search_term)
         YIELD node AS entity, score
-        WHERE entity.engagement_id = $engagement_id
+        WHERE entity.engagement_id IN $engagement_ids
         WITH entity, score
         ORDER BY score DESC
         LIMIT $top_k
@@ -323,7 +338,7 @@ class Neo4jStore:
             result = await session.run(
                 query,
                 search_term=search_term,
-                engagement_id=engagement_id,
+                engagement_ids=_engagement_scope(engagement_id),
                 top_k=top_k,
             )
             records = [record.data() async for record in result]
@@ -341,7 +356,7 @@ class Neo4jStore:
         entity_types: Optional[list[str]] = None,
     ) -> list[dict[str, Any]]:
         """KNN search over entity embeddings, expand to linked chunks."""
-        where_clause = "WHERE entity.engagement_id = $engagement_id"
+        where_clause = "WHERE entity.engagement_id IN $engagement_ids"
         if entity_types:
             where_clause += " AND entity.type IN $entity_types"
 
@@ -361,7 +376,7 @@ class Neo4jStore:
         """
         params: dict[str, Any] = {
             "query_embedding": query_embedding,
-            "engagement_id": engagement_id,
+            "engagement_ids": _engagement_scope(engagement_id),
             "top_k": top_k,
         }
         if entity_types:
@@ -385,7 +400,7 @@ class Neo4jStore:
         doc_types: Optional[list[str]] = None,
     ) -> list[dict[str, Any]]:
         """Full hybrid retrieval: vector + fulltext + graph expansion."""
-        where_clause = "WHERE chunk.engagement_id = $engagement_id"
+        where_clause = "WHERE chunk.engagement_id IN $engagement_ids"
         if doc_types:
             where_clause += " AND chunk.doc_type IN $doc_types"
 
@@ -404,7 +419,7 @@ class Neo4jStore:
         """
         params: dict[str, Any] = {
             "query_embedding": query_embedding,
-            "engagement_id": engagement_id,
+            "engagement_ids": _engagement_scope(engagement_id),
             "top_k": top_k,
         }
         if doc_types:
@@ -439,13 +454,13 @@ class Neo4jStore:
         // Vector KNN hits
         CALL db.index.vector.queryNodes('chunk_embeddings', $top_k, $query_embedding)
         YIELD node AS chunk, score
-        WHERE chunk.engagement_id = $engagement_id {where_filter}
+        WHERE chunk.engagement_id IN $engagement_ids {where_filter}
         WITH collect({{chunk: chunk, score: score}}) AS vector_hits
 
         // Fulltext hits
         CALL db.index.fulltext.queryNodes('chunk_fulltext', $query_text)
         YIELD node AS ft_chunk, score AS ft_score
-        WHERE ft_chunk.engagement_id = $engagement_id {where_filter}
+        WHERE ft_chunk.engagement_id IN $engagement_ids {where_filter}
         WITH vector_hits, collect({{chunk: ft_chunk, score: ft_score * 0.8}}) AS ft_hits
 
         // Merge and deduplicate
@@ -467,7 +482,7 @@ class Neo4jStore:
         params: dict[str, Any] = {
             "query_embedding": query_embedding,
             "query_text": query_text,
-            "engagement_id": engagement_id,
+            "engagement_ids": _engagement_scope(engagement_id),
             "top_k": top_k,
         }
         if doc_types:

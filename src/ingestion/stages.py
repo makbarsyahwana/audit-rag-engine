@@ -61,6 +61,7 @@ async def process_handler(payload: dict[str, Any]) -> None:
     s3_key = payload["s3_key"]
     filename = payload["filename"]
     doc_type = payload.get("doc_type", "other")
+    corpus_scope = payload.get("corpus_scope", "engagement")
     confidentiality_level = payload.get("confidentiality_level", "internal")
     content_type = payload.get("content_type", "application/octet-stream")
     title = payload.get("title")
@@ -102,6 +103,7 @@ async def process_handler(payload: dict[str, Any]) -> None:
         mime_type=content_type,
         file_size=len(file_data),
         doc_type=doc_type,
+        corpus_scope=corpus_scope,
         confidentiality_level=confidentiality_level,
         metadata=DocumentMetadata(
             title=title or filename,
