@@ -5,13 +5,42 @@ from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from src.ingestion.pipeline import run_ingestion_pipeline
+from src.config import settings
+from src.ingestion.stages import run_ingestion_pipeline
 from src.ingestion.task_broker import QUEUE_PROCESS, task_broker
 from src.models.document import IngestResponse, JobStatusResponse, ProcessingStatus
 from src.security.file_validator import validate_file
 from src.security.service_auth import parse_identity, verify_engagement_access
 from src.stores.document_store import document_store
 from src.stores.object_store import object_store
+
+_CHUNK = 64 * 1024  # 64 KiB read chunks
+
+
+async def _read_with_limit(file: UploadFile) -> bytes:
+    """Read an UploadFile in chunks, rejecting it early if it exceeds the size limit.
+
+    This prevents the server from buffering arbitrarily large files into
+    memory before the size check in validate_file() runs.
+    """
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(_CHUNK)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"File exceeds maximum upload size "
+                    f"({settings.max_upload_size_mb} MB)"
+                ),
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +141,7 @@ async def ingest_document(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
-    file_data = await file.read()
+    file_data = await _read_with_limit(file)
     if not file_data:
         raise HTTPException(status_code=400, detail="Empty file")
 
@@ -205,7 +234,11 @@ async def ingest_batch(
     for file in files:
         if not file.filename:
             continue
-        file_data = await file.read()
+        try:
+            file_data = await _read_with_limit(file)
+        except HTTPException:
+            skipped.append({"filename": file.filename, "reason": "exceeds size limit"})
+            continue
         if not file_data:
             continue
 

@@ -197,7 +197,7 @@ class SyncManager:
         connector: BaseConnector,
     ) -> dict[str, Any]:
         """Feed a connector document into the ingestion pipeline."""
-        from src.ingestion.pipeline import run_ingestion_pipeline
+        from src.ingestion.stages import run_ingestion_pipeline
 
         result = await run_ingestion_pipeline(
             file_data=doc.content,
