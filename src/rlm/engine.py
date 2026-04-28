@@ -452,6 +452,7 @@ async def rlm_execute(request: RlmExecuteRequest) -> RlmExecuteResponse:
         iterations_used=ctx.total_llm_calls,
         sub_calls_used=ctx.total_sub_calls,
         total_tokens=ctx.total_tokens,
+        max_depth_reached=ctx.max_depth_reached,
         trace=trace,
         duration_ms=duration_ms,
         error=error_msg,
@@ -467,9 +468,9 @@ def _strip_code_fences(text: str) -> str:
     """Remove markdown code fences that LLMs sometimes add around generated code."""
     stripped = text.strip()
     if stripped.startswith("```python"):
-        stripped = stripped[len("```python"):]
+        stripped = stripped[len("```python"):].strip()
     elif stripped.startswith("```"):
-        stripped = stripped[3:]
+        stripped = stripped[3:].strip()
     if stripped.endswith("```"):
-        stripped = stripped[:-3]
-    return stripped.strip()
+        stripped = stripped[:-3].strip()
+    return stripped
