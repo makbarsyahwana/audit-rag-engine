@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/", response_model=RetrieveResponse)
+@router.post("/", response_model=RetrieveResponse, response_model_by_alias=True)
 async def retrieve_auto(request: RetrieveRequest, req: Request):
     """Auto-routed retrieval (query router selects mode)."""
     # Security checks (ASI01 + ASI03)
@@ -97,7 +97,7 @@ async def retrieve_auto(request: RetrieveRequest, req: Request):
     )
 
 
-@router.post("/vector", response_model=RetrieveResponse)
+@router.post("/vector", response_model=RetrieveResponse, response_model_by_alias=True)
 async def retrieve_vector(request: RetrieveRequest):
     """Vector-only retrieval via Neo4j HNSW index."""
     doc_types = request.filters.doc_types or None
@@ -117,7 +117,7 @@ async def retrieve_vector(request: RetrieveRequest):
     )
 
 
-@router.post("/fulltext", response_model=RetrieveResponse)
+@router.post("/fulltext", response_model=RetrieveResponse, response_model_by_alias=True)
 async def retrieve_fulltext(request: RetrieveRequest):
     """Fulltext-only retrieval via Neo4j Lucene index."""
     doc_types = request.filters.doc_types or None
@@ -137,7 +137,7 @@ async def retrieve_fulltext(request: RetrieveRequest):
     )
 
 
-@router.post("/graph", response_model=RetrieveResponse)
+@router.post("/graph", response_model=RetrieveResponse, response_model_by_alias=True)
 async def retrieve_graph(request: RetrieveRequest):
     """Graph-only retrieval via Neo4j traversal."""
     chunks, latency = await graph_search(
@@ -156,7 +156,7 @@ async def retrieve_graph(request: RetrieveRequest):
     )
 
 
-@router.post("/entity-vector", response_model=RetrieveResponse)
+@router.post("/entity-vector", response_model=RetrieveResponse, response_model_by_alias=True)
 async def retrieve_entity_vector(request: RetrieveRequest):
     """Entity vector retrieval via Neo4j entity embeddings KNN."""
     chunks, latency = await entity_vector_search(
@@ -175,7 +175,11 @@ async def retrieve_entity_vector(request: RetrieveRequest):
     )
 
 
-@router.post("/graph-vector-fulltext", response_model=RetrieveResponse)
+@router.post(
+    "/graph-vector-fulltext",
+    response_model=RetrieveResponse,
+    response_model_by_alias=True,
+)
 async def retrieve_graph_vector_fulltext(request: RetrieveRequest):
     """Full hybrid retrieval: vector + fulltext + graph expansion."""
     doc_types = request.filters.doc_types or None
@@ -198,7 +202,7 @@ async def retrieve_graph_vector_fulltext(request: RetrieveRequest):
     )
 
 
-@router.post("/hybrid", response_model=RetrieveResponse)
+@router.post("/hybrid", response_model=RetrieveResponse, response_model_by_alias=True)
 async def retrieve_hybrid(request: RetrieveRequest):
     """Full hybrid retrieval (V+K+G) via Neo4j unified query."""
     doc_types = request.filters.doc_types or None

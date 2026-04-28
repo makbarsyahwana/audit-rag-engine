@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from src.config import settings
 from src.generation.citations import check_abstention, extract_citations
-from src.generation.llm import invoke_llm
+from src.generation.llm import invoke_llm_with_usage
 from src.generation.prompts.prompt_router import get_qa_builder
 from src.models.retrieval import (
     GenerateRequest,
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/", response_model=GenerateResponse)
+@router.post("/", response_model=GenerateResponse, response_model_by_alias=True)
 async def generate_answer(request: GenerateRequest, req: Request):
     """Generate answer with citations from retrieved context.
 
@@ -180,7 +180,9 @@ async def generate_answer(request: GenerateRequest, req: Request):
     build_messages = get_qa_builder(request.app_mode)
     messages = build_messages(request.query, chunk_dicts)
     try:
-        llm_response = await invoke_llm(messages)
+        llm_response, prompt_tokens, completion_tokens = await invoke_llm_with_usage(
+            messages,
+        )
         llm_circuit_breaker.record_success()
     except Exception as exc:
         llm_circuit_breaker.record_failure()
@@ -213,7 +215,11 @@ async def generate_answer(request: GenerateRequest, req: Request):
     latency_ms = (time.time() - start) * 1000
 
     # Record usage and behavior (ASI02 + ASI10)
-    await token_budget.record_usage(request.engagement_id)
+    await token_budget.record_usage(
+        engagement_id=request.engagement_id,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
     behavioral_monitor.record(
         engagement_id=request.engagement_id,
         response_length=len(cleaned_answer),
@@ -240,4 +246,7 @@ async def generate_answer(request: GenerateRequest, req: Request):
         chunks_retrieved=len(chunks),
         latency_ms=latency_ms,
         abstained=abstained,
+        model=settings.llm_model,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
     )
