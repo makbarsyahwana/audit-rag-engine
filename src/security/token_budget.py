@@ -75,8 +75,8 @@ class TokenBudget:
                 pipe.expire(f"budget:{key}", 86400 * 2)  # 2-day TTL
                 await pipe.execute()
                 return
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Redis record_usage failed, falling back to in-memory: %s", exc)
 
         # Fallback: in-memory
         if key not in self._usage:
@@ -102,8 +102,8 @@ class TokenBudget:
                         completion_tokens=int(data.get("completion", 0)),
                         request_count=int(data.get("requests", 0)),
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Redis get_usage failed, falling back to in-memory: %s", exc)
 
         return self._usage.get(key, UsageRecord(date=self._today()))
 

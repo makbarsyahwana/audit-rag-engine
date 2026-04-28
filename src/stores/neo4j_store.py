@@ -103,6 +103,7 @@ class Neo4jStore:
         """Upsert a Chunk node with embedding."""
         query = """
         MERGE (c:Chunk {id: $chunk_id})
+        ON CREATE SET c.created_at = datetime()
         SET c.document_id = $document_id,
             c.engagement_id = $engagement_id,
             c.content = $content,
@@ -111,7 +112,8 @@ class Neo4jStore:
             c.page_number = $page_number,
             c.section = $section,
             c.doc_type = $doc_type,
-            c.embedding = $embedding
+            c.embedding = $embedding,
+            c.updated_at = datetime()
         """
         async with self.driver.session() as session:
             await session.run(query, **chunk)
@@ -121,6 +123,7 @@ class Neo4jStore:
         query = """
         UNWIND $chunks AS chunk
         MERGE (c:Chunk {id: chunk.chunk_id})
+        ON CREATE SET c.created_at = datetime()
         SET c.document_id = chunk.document_id,
             c.engagement_id = chunk.engagement_id,
             c.content = chunk.content,
@@ -129,7 +132,8 @@ class Neo4jStore:
             c.page_number = chunk.page_number,
             c.section = chunk.section,
             c.doc_type = chunk.doc_type,
-            c.embedding = chunk.embedding
+            c.embedding = chunk.embedding,
+            c.updated_at = datetime()
         """
         async with self.driver.session() as session:
             await session.run(query, chunks=chunks)
