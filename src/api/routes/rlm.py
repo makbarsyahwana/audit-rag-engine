@@ -24,7 +24,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/execute", response_model=RlmExecuteResponse)
+@router.post(
+    "/execute",
+    response_model=RlmExecuteResponse,
+    response_model_by_alias=True,
+)
 async def execute_rlm(request: RlmExecuteRequest, req: Request):
     """Execute an RLM deep-analysis query.
 
@@ -70,7 +74,7 @@ async def execute_rlm(request: RlmExecuteRequest, req: Request):
         )
 
     # 5. Circuit breaker (ASI08)
-    if not llm_circuit_breaker.allow_request():
+    if not llm_circuit_breaker.is_allowed():
         raise HTTPException(
             status_code=503,
             detail="LLM circuit breaker is open — too many recent failures",
@@ -89,10 +93,11 @@ async def execute_rlm(request: RlmExecuteRequest, req: Request):
 
     llm_circuit_breaker.record_success()
 
-    # 7. Token budget — deduct usage (ASI02)
+    # 7. Token budget — record usage (ASI02)
     if response.total_tokens > 0:
-        await token_budget.deduct(
-            request.engagement_id, response.total_tokens,
+        await token_budget.record_usage(
+            engagement_id=request.engagement_id,
+            completion_tokens=response.total_tokens,
         )
 
     # 8. Output guard (ASI01/06)

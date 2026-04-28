@@ -6,8 +6,10 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from src.models.retrieval import CamelCaseModel
 
-class RlmToolCall(BaseModel):
+
+class RlmToolCall(CamelCaseModel):
     """A single tool call made during an RLM iteration."""
 
     tool: str  # "rag_retrieve", "mongo_fetch", "sub_rlm"
@@ -16,7 +18,7 @@ class RlmToolCall(BaseModel):
     duration_ms: float = 0.0
 
 
-class RlmIteration(BaseModel):
+class RlmIteration(CamelCaseModel):
     """A single iteration of the RLM control loop."""
 
     iteration: int
@@ -30,7 +32,7 @@ class RlmIteration(BaseModel):
     error: Optional[str] = None
 
 
-class RlmSubCall(BaseModel):
+class RlmSubCall(CamelCaseModel):
     """Metadata for a sub_RLM recursive call."""
 
     depth: int
@@ -42,7 +44,7 @@ class RlmSubCall(BaseModel):
     result_preview: str = ""  # First 200 chars of result
 
 
-class RlmTrace(BaseModel):
+class RlmTrace(CamelCaseModel):
     """Full execution trace for an RLM run."""
 
     iterations: list[RlmIteration] = Field(default_factory=list)
@@ -74,7 +76,7 @@ class RlmStatus(str, Enum):
     TIMEOUT = "timeout"
 
 
-class RlmExecuteResponse(BaseModel):
+class RlmExecuteResponse(CamelCaseModel):
     """Response from the /rlm/execute endpoint."""
 
     answer: str
@@ -84,6 +86,8 @@ class RlmExecuteResponse(BaseModel):
     iterations_used: int = 0
     sub_calls_used: int = 0
     total_tokens: int = 0
+    # Mirrored at the top level so NestJS can read it flat without digging into `trace`.
+    max_depth_reached: int = 0
     trace: RlmTrace = Field(default_factory=RlmTrace)
     duration_ms: float = 0.0
     started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
