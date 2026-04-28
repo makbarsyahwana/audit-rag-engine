@@ -4,7 +4,6 @@ import logging
 
 from fastapi import APIRouter, Request
 
-from src.evaluation.ab_testing import ab_manager
 from src.evaluation.golden_set import get_golden_set, list_golden_sets
 from src.observability.alerts import alert_manager
 from src.observability.drift_detection import drift_detector
@@ -81,24 +80,3 @@ async def get_golden_set_detail(domain: str, req: Request):
         return {"error": f"Golden set not found for domain: {domain}"}
     return gs.model_dump()
 
-
-# ---------------------------------------------------------------------------
-# A/B experiments
-# ---------------------------------------------------------------------------
-
-@router.get("/experiments")
-async def list_experiments(req: Request):
-    """List registered A/B experiments."""
-    # Security: identity verification (ASI03)
-    parse_identity(req)
-    return {
-        "experiments": [e.model_dump() for e in ab_manager.list_experiments()]
-    }
-
-
-@router.get("/experiments/{experiment_id}/summary")
-async def get_experiment_summary(experiment_id: str, req: Request):
-    """Get summary for an A/B experiment."""
-    # Security: identity verification (ASI03)
-    parse_identity(req)
-    return ab_manager.get_summary(experiment_id).model_dump()

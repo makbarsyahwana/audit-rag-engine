@@ -1,16 +1,17 @@
 """RabbitMQ-based task broker for async ingestion pipeline.
 
 Provides publish/consume helpers with stage-based queues,
-dead-letter exchange, and retry logic using our in-house AMQP client.
+dead-letter exchange, and retry logic using aio-pika.
 """
 
 import json
 import logging
 from typing import Any, Callable, Optional
 
+from aio_pika import DeliveryMode, ExchangeType, Message, connect_robust
+from aio_pika.abc import AbstractChannel, AbstractRobustConnection
+
 from src.config import settings
-from src.lib.amqp import DeliveryMode, ExchangeType, Message, connect_robust
-from src.lib.amqp.client import Channel, Connection
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,8 @@ class TaskBroker:
     """Async RabbitMQ task broker for pipeline stages."""
 
     def __init__(self) -> None:
-        self._connection: Optional[Connection] = None
-        self._channel: Optional[Channel] = None
+        self._connection: Optional[AbstractRobustConnection] = None
+        self._channel: Optional[AbstractChannel] = None
 
     async def connect(self) -> None:
         """Connect to RabbitMQ and declare exchanges/queues."""
@@ -67,7 +68,7 @@ class TaskBroker:
             logger.info("TaskBroker connection closed")
 
     @property
-    def channel(self) -> Channel:
+    def channel(self) -> AbstractChannel:
         if self._channel is None:
             raise RuntimeError("TaskBroker not connected. Call connect() first.")
         return self._channel
@@ -123,8 +124,7 @@ class TaskBroker:
             queue_name, durable=True, passive=True
         )
 
-        queue_iter = await queue.iterator()
-        async with queue_iter as qi:
+        async with queue.iterator() as qi:
             async for message in qi:
                 async with message.process(requeue=False):
                     retry_count = (message.headers or {}).get("x-retry-count", 0)
