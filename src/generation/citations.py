@@ -47,7 +47,7 @@ def extract_citations(
                 document_id=chunk.document_id,
                 document_name=chunk.document_name,
                 excerpt=chunk.content[:300],
-                page=chunk.page_number,
+                page_number=chunk.page_number,
                 score=chunk.score,
             ))
 

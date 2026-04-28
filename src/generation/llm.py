@@ -160,3 +160,24 @@ async def invoke_llm(
     client = get_llm_client(model=model, temperature=temperature)
     response = await client.ainvoke(messages)
     return response.content
+
+
+async def invoke_llm_with_usage(
+    messages: list[dict[str, str]],
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+) -> tuple[str, int, int]:
+    """Invoke the LLM and return content plus prompt/completion token counts.
+
+    Reads `usage_metadata` from the AIMessage (LangChain standard). Falls back
+    to (0, 0) when the provider does not surface usage metadata.
+
+    Returns:
+        Tuple of (content, prompt_tokens, completion_tokens).
+    """
+    client = get_llm_client(model=model, temperature=temperature)
+    response = await client.ainvoke(messages)
+    usage = getattr(response, "usage_metadata", None) or {}
+    prompt_tokens = int(usage.get("input_tokens", 0) or 0)
+    completion_tokens = int(usage.get("output_tokens", 0) or 0)
+    return response.content, prompt_tokens, completion_tokens
