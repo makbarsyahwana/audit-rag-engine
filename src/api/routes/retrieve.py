@@ -40,6 +40,7 @@ async def retrieve_auto(request: RetrieveRequest, req: Request):
 
     # Delegate to the appropriate mode handler
     doc_types = request.filters.doc_types or None
+    date_range = request.filters.date_range
 
     if mode == RetrievalMode.VECTOR:
         chunks, latency = await vector_search(
@@ -47,6 +48,7 @@ async def retrieve_auto(request: RetrieveRequest, req: Request):
             engagement_id=request.engagement_id,
             top_k=request.top_k,
             doc_types=doc_types,
+            date_range=date_range,
         )
     elif mode == RetrievalMode.FULLTEXT:
         chunks, latency = await fulltext_search(
@@ -54,6 +56,7 @@ async def retrieve_auto(request: RetrieveRequest, req: Request):
             engagement_id=request.engagement_id,
             top_k=request.top_k,
             doc_types=doc_types,
+            date_range=date_range,
         )
     elif mode == RetrievalMode.GRAPH:
         chunks, latency = await graph_search(
@@ -61,6 +64,7 @@ async def retrieve_auto(request: RetrieveRequest, req: Request):
             engagement_id=request.engagement_id,
             top_k=request.top_k,
             depth=request.graph_expansion.depth,
+            date_range=date_range,
         )
     elif mode == RetrievalMode.ENTITY_VECTOR:
         chunks, latency = await entity_vector_search(
@@ -68,6 +72,7 @@ async def retrieve_auto(request: RetrieveRequest, req: Request):
             engagement_id=request.engagement_id,
             top_k=request.top_k,
             entity_types=request.filters.entity_types or None,
+            date_range=date_range,
         )
     elif mode == RetrievalMode.GRAPH_VECTOR_FULLTEXT:
         chunks, latency = await graph_vector_fulltext_search(
@@ -75,6 +80,7 @@ async def retrieve_auto(request: RetrieveRequest, req: Request):
             engagement_id=request.engagement_id,
             top_k=request.top_k,
             doc_types=doc_types,
+            date_range=date_range,
         )
     else:
         chunks, latency = await hybrid_search(
@@ -82,6 +88,7 @@ async def retrieve_auto(request: RetrieveRequest, req: Request):
             engagement_id=request.engagement_id,
             top_k=request.top_k,
             doc_types=doc_types,
+            date_range=date_range,
         )
 
     # Optional reranking
@@ -106,6 +113,7 @@ async def retrieve_vector(request: RetrieveRequest):
         engagement_id=request.engagement_id,
         top_k=request.top_k,
         doc_types=doc_types,
+        date_range=request.filters.date_range,
     )
 
     return RetrieveResponse(
@@ -126,6 +134,7 @@ async def retrieve_fulltext(request: RetrieveRequest):
         engagement_id=request.engagement_id,
         top_k=request.top_k,
         doc_types=doc_types,
+        date_range=request.filters.date_range,
     )
 
     return RetrieveResponse(
@@ -145,6 +154,7 @@ async def retrieve_graph(request: RetrieveRequest):
         engagement_id=request.engagement_id,
         top_k=request.top_k,
         depth=request.graph_expansion.depth,
+        date_range=request.filters.date_range,
     )
 
     return RetrieveResponse(
@@ -164,6 +174,7 @@ async def retrieve_entity_vector(request: RetrieveRequest):
         engagement_id=request.engagement_id,
         top_k=request.top_k,
         entity_types=request.filters.entity_types or None,
+        date_range=request.filters.date_range,
     )
 
     return RetrieveResponse(
@@ -188,6 +199,7 @@ async def retrieve_graph_vector_fulltext(request: RetrieveRequest):
         engagement_id=request.engagement_id,
         top_k=request.top_k,
         doc_types=doc_types,
+        date_range=request.filters.date_range,
     )
 
     if settings.rerank_enabled:
@@ -211,6 +223,7 @@ async def retrieve_hybrid(request: RetrieveRequest):
         engagement_id=request.engagement_id,
         top_k=request.top_k,
         doc_types=doc_types,
+        date_range=request.filters.date_range,
     )
 
     if settings.rerank_enabled:

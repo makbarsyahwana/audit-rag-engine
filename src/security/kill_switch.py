@@ -61,7 +61,8 @@ class KillSwitch:
             if val and val in KillSwitchLevel.__members__.values():
                 return KillSwitchLevel(val)
             return KillSwitchLevel.ACTIVE
-        except Exception:
+        except Exception as exc:
+            logger.warning("Kill switch Redis read failed (get_level): %s", exc)
             return self._fallback_level
 
     async def get_reason(self) -> str:
@@ -73,7 +74,8 @@ class KillSwitch:
                 await self._redis.get(KILL_SWITCH_REASON_KEY)  # type: ignore[union-attr]
                 or ""
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning("Kill switch Redis read failed (get_reason): %s", exc)
             return ""
 
     async def set_level(

@@ -2,10 +2,11 @@
 
 import logging
 import time
+from datetime import datetime
 from typing import Optional
 
 from src.ingestion.embedder import embed_query
-from src.models.retrieval import RetrievedChunk
+from src.models.retrieval import DateRangeFilter, RetrievedChunk
 from src.stores.neo4j_store import neo4j_store
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ async def vector_search(
     engagement_id: str,
     top_k: int = 10,
     doc_types: Optional[list[str]] = None,
+    date_range: Optional[DateRangeFilter] = None,
 ) -> tuple[list[RetrievedChunk], float]:
     """Perform vector similarity search over chunk embeddings.
 
@@ -37,6 +39,8 @@ async def vector_search(
         engagement_id=engagement_id,
         top_k=top_k,
         doc_types=doc_types,
+        date_start=date_range.start if date_range else None,
+        date_end=date_range.end if date_range else None,
     )
 
     chunks = _parse_chunk_records(records)

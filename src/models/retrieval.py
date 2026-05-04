@@ -1,9 +1,10 @@
 """Retrieval request/response models."""
 
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Literal, Optional
+from typing import Literal, Optional, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -31,13 +32,41 @@ class RetrievalMode(str, Enum):
     AUTO = "auto"
 
 
+class DateRangeFilter(BaseModel):
+    """Date range filter applied against chunk `created_at` in Neo4j.
+
+    Chunk nodes store `created_at` via Cypher `datetime()` (zoned instant). Bounds
+    must be timezone-aware UTC so Cypher `datetime($param)` yields a comparable
+    zoned datetime; naive client values are interpreted as UTC.
+    """
+
+    start: Optional[datetime] = None
+    end: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def _coerce_bounds_to_utc_aware(self) -> Self:
+        if self.start is not None:
+            s = self.start
+            if s.tzinfo is None:
+                object.__setattr__(self, "start", s.replace(tzinfo=timezone.utc))
+            else:
+                object.__setattr__(self, "start", s.astimezone(timezone.utc))
+        if self.end is not None:
+            e = self.end
+            if e.tzinfo is None:
+                object.__setattr__(self, "end", e.replace(tzinfo=timezone.utc))
+            else:
+                object.__setattr__(self, "end", e.astimezone(timezone.utc))
+        return self
+
+
 class RetrievalFilters(BaseModel):
     """Filters applied during retrieval."""
 
     doc_types: list[str] = Field(default_factory=list)
     confidentiality_levels: list[str] = Field(default_factory=list)
     entity_types: list[str] = Field(default_factory=list)
-    date_range: Optional[dict] = None  # {"start": "...", "end": "..."}
+    date_range: Optional[DateRangeFilter] = None
 
 
 class GraphExpansion(BaseModel):

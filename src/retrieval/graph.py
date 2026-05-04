@@ -2,8 +2,9 @@
 
 import logging
 import time
+from typing import Optional
 
-from src.models.retrieval import RelatedEntity, RetrievedChunk
+from src.models.retrieval import DateRangeFilter, RelatedEntity, RetrievedChunk
 from src.stores.neo4j_store import neo4j_store
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,7 @@ async def graph_search(
     engagement_id: str,
     top_k: int = 10,
     depth: int = 2,
+    date_range: Optional[DateRangeFilter] = None,
 ) -> tuple[list[RetrievedChunk], float]:
     """Perform graph traversal search: find entities and their linked chunks.
 
@@ -33,6 +35,8 @@ async def graph_search(
         engagement_id=engagement_id,
         top_k=top_k,
         depth=depth,
+        date_start=date_range.start if date_range else None,
+        date_end=date_range.end if date_range else None,
     )
 
     chunks = _parse_graph_records(records)

@@ -9,7 +9,7 @@ import time
 from typing import Optional
 
 from src.ingestion.embedder import embed_query
-from src.models.retrieval import RelatedEntity, RetrievedChunk
+from src.models.retrieval import DateRangeFilter, RelatedEntity, RetrievedChunk
 from src.stores.neo4j_store import neo4j_store
 
 logger = logging.getLogger(__name__)
@@ -20,6 +20,7 @@ async def entity_vector_search(
     engagement_id: str,
     top_k: int = 10,
     entity_types: Optional[list[str]] = None,
+    date_range: Optional[DateRangeFilter] = None,
 ) -> tuple[list[RetrievedChunk], float]:
     """KNN search over entity embeddings, then expand to linked chunks.
 
@@ -41,6 +42,8 @@ async def entity_vector_search(
         engagement_id=engagement_id,
         top_k=top_k,
         entity_types=entity_types,
+        date_start=date_range.start if date_range else None,
+        date_end=date_range.end if date_range else None,
     )
 
     chunks = _parse_entity_vector_records(records)
